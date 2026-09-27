@@ -1909,3 +1909,231 @@ window.updateStatus = updateStatus;
 window.renderAdmin = renderAdmin;
 window.runEligibilityPreCheck = runEligibilityPreCheck;
 window.runCrossVerification = runCrossVerification;
+
+/* =========================================================
+   13. STUDY BUDDY — AI ASSISTANT (rule/keyword based)
+   Answers questions about the platform, schemes, documents,
+   eligibility, tracking, and general study/scholarship tips.
+   Runs entirely client-side — no external API calls.
+   ========================================================= */
+const STUDY_BUDDY_KB = [
+  {
+    id: "greeting",
+    keywords: ["hi", "hello", "hey", "namaste", "yo"],
+    answer:
+      "Hi! I'm Study Buddy 🎓 I can help with questions about NFST / NOS, the application steps, required documents, eligibility, and tracking your status. What would you like to know?"
+  },
+  {
+    id: "schemes",
+    keywords: ["scheme", "schemes", "which scholarship", "what scholarship", "options", "nfst vs nos", "nfst and nos"],
+    answer:
+      "TribalScholar currently lists two schemes:\n\n• NFST — National Fellowship for ST Students (for PhD / research)\n• NOS — National Overseas Scholarship (for Master's/PhD study abroad, needs a university offer letter)\n\nAsk me about either one, e.g. \"what is NFST\" or \"eligibility for NOS\"."
+  },
+  {
+    id: "nfst",
+    keywords: ["nfst", "fellowship", "national fellowship"],
+    answer:
+      "NFST — National Fellowship for ST Students:\n• For PhD / research-level study in India\n• Requires: ST certificate, marksheet, income certificate\n• Configured pre-check rules: marks ≥ 55%, annual family income ≤ ₹8,00,000\n\nThis is prototype logic for the demo, not the official rule set — always check the real scheme guidelines too."
+  },
+  {
+    id: "nos",
+    keywords: ["nos", "overseas", "study abroad", "national overseas"],
+    answer:
+      "NOS — National Overseas Scholarship:\n• For Master's or PhD study abroad\n• Requires: ST certificate, marksheet, income certificate, AND a university offer letter\n• Configured pre-check rules: marks ≥ 60%, annual family income ≤ ₹8,00,000\n\nThis is prototype logic for the demo — check the official NOS guidelines for the real criteria."
+  },
+  {
+    id: "eligibility",
+    keywords: ["eligible", "eligibility", "criteria", "qualify", "income limit", "marks required", "percentage required"],
+    answer:
+      "Eligibility (prototype rules) depends on your chosen scheme:\n• NFST: PhD/research level, marks ≥ 55%, income ≤ ₹8,00,000\n• NOS: Master's or PhD, marks ≥ 60%, income ≤ ₹8,00,000, offer letter required\n\nOpen the Apply page, fill the form, and the AI Eligibility Engine panel will show you a live pass/fail/review breakdown."
+  },
+  {
+    id: "documents",
+    keywords: ["document", "documents", "upload", "certificate", "papers", "files needed", "what to upload"],
+    answer:
+      "You'll typically need to upload:\n• ST Certificate\n• Marksheets / Academic Record\n• Income Certificate\n• University Offer Letter (only for NOS)\n\nEach one is scanned with on-device OCR so the portal can cross-check it against what you typed in the form."
+  },
+  {
+    id: "apply-steps",
+    keywords: ["how to apply", "apply", "start application", "application process", "steps"],
+    answer:
+      "Applying is 4 steps:\n1. Register / log in and pick a scheme\n2. Fill in personal, academic & income details\n3. Upload your documents (OCR runs automatically)\n4. Run the Readiness Checker, fix anything flagged, then submit\n\nYou can start from the \"Start Application\" button on this page."
+  },
+  {
+    id: "readiness",
+    keywords: ["readiness", "ready to submit", "missing fields", "complete application", "check my application"],
+    answer:
+      "On the Apply page, click \"Check My Application\" under Application Readiness Checker. It flags missing required fields or documents, and warns you if a certificate looks expired, before you submit."
+  },
+  {
+    id: "track",
+    keywords: ["track", "status", "application id", "where is my application", "application status"],
+    answer:
+      "Go to the \"Track Application\" tab and enter your Application ID (e.g. TS260001). You'll see the current status — Submitted, Under Review, Deficient, or Approved — plus a timeline and any pre-check findings."
+  },
+  {
+    id: "deficient",
+    keywords: ["deficient", "correction", "rejected", "issue with my application", "what went wrong", "fix my application"],
+    answer:
+      "\"Deficient\" means the AI pre-check found an issue — a missing field, a mismatch between your form and OCR data, or a possibly expired certificate. Track your application to see the exact issues, and check the Smart Deficiency Alert (the 🔔 button) for the full notice."
+  },
+  {
+    id: "mismatch",
+    keywords: ["mismatch", "name doesn't match", "ocr wrong", "incorrect reading", "wrong name"],
+    answer:
+      "If OCR reads your document differently from what you typed (e.g. your name or marks), the field is highlighted and a note explains the difference. Double-check your spelling first — if the document itself is correct, it will still be sent for officer review."
+  },
+  {
+    id: "income",
+    keywords: ["income certificate", "income proof", "how much income", "family income"],
+    answer:
+      "The income certificate is used to verify your annual family income against the scheme's configured limit (₹8,00,000 in this prototype). Make sure the certificate is recent — certificates older than about a year may be flagged as possibly expired."
+  },
+  {
+    id: "officer",
+    keywords: ["officer", "review", "who approves", "who checks my application"],
+    answer:
+      "A human officer always reviews applications in the Officer Portal — the AI pre-checks (readiness, eligibility, OCR cross-verification) only flag issues in advance; they don't grant or deny scholarships themselves."
+  },
+  {
+    id: "identity",
+    keywords: ["aadhaar", "digilocker", "identity verification", "ekyc", "otp"],
+    answer:
+      "You can verify your identity or fetch documents via the demo Aadhaar/DigiLocker flow on the Apply page. In this prototype, OTP verification uses the demo code 123456 — real eKYC would need an official licensed integration."
+  },
+  {
+    id: "study-tips",
+    keywords: ["study tips", "how to study", "exam tips", "prepare for exam", "improve marks", "study better"],
+    answer:
+      "A few general study habits that help with scholarship-level academics:\n• Break revision into short, focused sessions with breaks (e.g. 25–5 min)\n• Practice past papers or problem sets, not just re-reading notes\n• Summarize each topic in your own words after studying it\n• Sleep and review are both part of learning — don't cut sleep to cram\n\nFor scholarship-specific prep, check your target scheme's official syllabus/interview guidelines."
+  },
+  {
+    id: "phd-research",
+    keywords: ["phd", "research proposal", "choosing a guide", "research topic"],
+    answer:
+      "For PhD/research-track scholarships like NFST, a strong application usually includes a clear research proposal (problem, method, why it matters), a suitable guide/institution, and a track record shown through your marksheets and any prior research. This portal itself doesn't evaluate research proposals — that's part of the official scheme process."
+  },
+  {
+    id: "contact",
+    keywords: ["contact", "help desk", "support", "phone number", "email support", "talk to someone"],
+    answer:
+      "This is a student-built prototype, so there isn't a live support line here. For official queries, contact your scholarship scheme's real helpdesk/state nodal office — I can only answer questions about how this demo portal works."
+  },
+  {
+    id: "about",
+    keywords: ["what is tribalscholar", "about this site", "what is this website", "what does this do"],
+    answer:
+      "TribalScholar is a prototype scholarship management portal for Scheduled Tribe students — it lets you apply for NFST/NOS, uploads documents with automatic OCR reading, runs AI-style pre-checks, and lets you track your application status."
+  }
+];
+
+const STUDY_BUDDY_FALLBACK =
+  "I'm not sure about that one yet — I can help with scheme details (NFST/NOS), documents, eligibility, the application steps, tracking status, or general study tips. Try one of the quick topics below, or rephrase your question.";
+
+const STUDY_BUDDY_QUICK_TOPICS = [
+  { label: "NFST vs NOS", query: "What is the difference between NFST and NOS?" },
+  { label: "Documents needed", query: "What documents do I need to upload?" },
+  { label: "Eligibility rules", query: "What are the eligibility criteria?" },
+  { label: "How to apply", query: "How do I apply?" },
+  { label: "Track my status", query: "How do I track my application?" },
+  { label: "Study tips", query: "Give me some study tips" }
+];
+
+let studyBuddyOpened = false;
+
+function toggleStudyBuddy() {
+  const panel = document.getElementById("studyBuddyPanel");
+  if (!panel) return;
+
+  const willOpen = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden", !willOpen);
+
+  if (willOpen && !studyBuddyOpened) {
+    studyBuddyOpened = true;
+    renderStudyBuddyQuickReplies();
+    addStudyBuddyMessage(
+      "bot",
+      "Hi! I'm Study Buddy 🎓 Ask me anything about NFST/NOS, documents, eligibility, applying, tracking status, or general study tips."
+    );
+  }
+
+  if (willOpen) {
+    document.getElementById("studyBuddyInput")?.focus();
+  }
+}
+
+function renderStudyBuddyQuickReplies() {
+  const wrap = document.getElementById("studyBuddyQuickReplies");
+  if (!wrap) return;
+
+  wrap.innerHTML = STUDY_BUDDY_QUICK_TOPICS.map(
+    (topic, index) => `
+      <button type="button" class="study-buddy-chip" data-study-buddy-topic="${index}">
+        ${escapeHTML(topic.label)}
+      </button>
+    `
+  ).join("");
+}
+
+function addStudyBuddyMessage(sender, text) {
+  const messages = document.getElementById("studyBuddyMessages");
+  if (!messages) return;
+
+  const bubble = document.createElement("div");
+  bubble.className = `study-buddy-msg ${sender}`;
+  bubble.textContent = text;
+  messages.appendChild(bubble);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function findStudyBuddyAnswer(rawQuery) {
+  const query = rawQuery.toLowerCase().trim();
+  if (!query) return STUDY_BUDDY_FALLBACK;
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  STUDY_BUDDY_KB.forEach(entry => {
+    let score = 0;
+    entry.keywords.forEach(keyword => {
+      if (query.includes(keyword)) {
+        score += keyword.split(" ").length; // reward longer/more specific phrase matches
+      }
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = entry;
+    }
+  });
+
+  return bestMatch ? bestMatch.answer : STUDY_BUDDY_FALLBACK;
+}
+
+function handleStudyBuddySend(rawQuery) {
+  const query = rawQuery.trim();
+  if (!query) return;
+
+  addStudyBuddyMessage("user", query);
+
+  const answer = findStudyBuddyAnswer(query);
+  setTimeout(() => addStudyBuddyMessage("bot", answer), 250);
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  document.getElementById("studyBuddyForm")?.addEventListener("submit", function (event) {
+    event.preventDefault();
+    const input = document.getElementById("studyBuddyInput");
+    if (!input) return;
+    handleStudyBuddySend(input.value);
+    input.value = "";
+  });
+
+  document.getElementById("studyBuddyQuickReplies")?.addEventListener("click", function (event) {
+    const chip = event.target.closest("[data-study-buddy-topic]");
+    if (!chip) return;
+    const topic = STUDY_BUDDY_QUICK_TOPICS[Number(chip.dataset.studyBuddyTopic)];
+    if (topic) handleStudyBuddySend(topic.query);
+  });
+});
+
+window.toggleStudyBuddy = toggleStudyBuddy;
