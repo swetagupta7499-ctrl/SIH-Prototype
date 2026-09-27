@@ -3,538 +3,372 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>TribalScholar | Scholarship Portal</title>
-
   <link rel="stylesheet" href="style.css">
+
+  <!-- AI-POWERED OCR ENGINE — libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // pdf.js needs a worker file to render PDF pages to an image before OCR
+    window.addEventListener("load", function () {
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      }
+    });
+  </script>
+
+  <!-- GOOGLE TRANSLATE -->
+  <script>
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          includedLanguages:
+            "hi,en,pa,gu,mr,bn,ta,te,kn,ml,or,as,ur,ne,sd,sa,ks,doi,mni,brx,sat",
+          layout:
+            google.translate.TranslateElement.InlineLayout.SIMPLE
+        },
+        "google_translate_element"
+      );
+    }
+  </script>
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </head>
-
-<script>
-  function googleTranslateElementInit() {
-    new google.translate.TranslateElement(
-      {
-        pageLanguage: "en",
-        includedLanguages:
-          "hi,en,pa,gu,mr,bn,ta,te,kn,ml,or,as,ur,ne,sd,sa,ks,doi,mni,brx,sat",
-        layout:
-          google.translate.TranslateElement.InlineLayout.SIMPLE
-      },
-      "google_translate_element"
-    );
-  }
-</script>
-
-<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 <body>
 
   <header class="navbar">
-
     <a class="brand" href="#" onclick="showPage('home')">
       <span class="brand-icon">T</span>
-
-      <span>
-        TribalScholar
-        <small>Scholarship Management System</small>
-      </span>
+      <span>TribalScholar<small>Scholarship Management System</small></span>
     </a>
 
     <nav>
-
-      <button
-        class="nav-btn active"
-        data-page="home"
-        onclick="showPage('home')">
+      <button class="nav-btn active" data-page="home" onclick="showPage('home')">
         Home
       </button>
 
       <div id="google_translate_element"></div>
 
-      <button
-        class="nav-btn"
-        data-page="apply"
-        onclick="showPage('apply')">
+      <button class="nav-btn" data-page="apply" onclick="showPage('apply')">
         Apply
       </button>
 
-      <button
-        class="nav-btn"
-        data-page="track"
-        onclick="showPage('track')">
+      <button class="nav-btn" data-page="track" onclick="showPage('track')">
         Track Application
       </button>
 
-      <button
-        class="nav-btn"
-        data-page="admin"
-        onclick="showPage('admin')">
+      <button class="nav-btn" data-page="admin" onclick="showPage('admin')">
         Officer Portal
       </button>
 
+      <!-- SUPABASE AUTH LOGIN / USER MENU -->
+      <div id="authNavigation"></div>
     </nav>
-
   </header>
 
-
   <main>
-
     <!-- HOME PAGE -->
     <section id="home" class="page active">
-
       <div class="hero">
-
         <div class="hero-content">
-
-          <span class="eyebrow">
-            AI-ENABLED SCHOLARSHIP PLATFORM
-          </span>
-
-          <h1>
-            Empowering Tribal Students Through Education
-          </h1>
-
+          <span class="eyebrow">AI-ENABLED SCHOLARSHIP PLATFORM</span>
+          <h1>Empowering Tribal Students Through Education</h1>
           <p>
             A unified platform to apply for scholarships and fellowships,
             check application requirements, and track progress.
           </p>
-
-          <button
-            class="primary-btn"
-            onclick="showPage('apply')">
+          <button class="primary-btn" onclick="showPage('apply')">
             Start Application →
           </button>
-
         </div>
-
 
         <div class="hero-card">
-
           <div class="hero-symbol">🎓</div>
-
           <h3>Your education. Your future.</h3>
-
-          <p>
-            One platform for scholarship applications and tracking.
-          </p>
-
+          <p>One platform for scholarship applications and tracking.</p>
           <div class="hero-tags">
-            <span>NFST</span>
-            <span>NOS</span>
-            <span>Digital Portal</span>
+            <span>NFST</span><span>NOS</span><span>Digital Portal</span>
           </div>
-
         </div>
-
       </div>
 
-
       <div class="stats">
-
         <div class="stat-card">
           <span>Available schemes</span>
           <strong>02</strong>
         </div>
-
         <div class="stat-card">
           <span>Demo applications</span>
           <strong id="homeTotal">0</strong>
         </div>
-
         <div class="stat-card">
           <span>Pending review</span>
           <strong id="homePending">0</strong>
         </div>
-
       </div>
 
-
       <div class="section-heading">
-
         <div>
           <span class="eyebrow">EXPLORE OPPORTUNITIES</span>
           <h2>Scholarship Schemes</h2>
         </div>
-
       </div>
 
-
       <div class="scheme-grid">
-
         <article class="scheme-card">
-
           <div class="scheme-icon">🔬</div>
-
           <span class="pill">Research in India</span>
-
-          <h3>
-            National Fellowship for ST Students
-          </h3>
-
+          <h3>National Fellowship for ST Students</h3>
           <p>
             A fellowship scheme for eligible Scheduled Tribe students
             pursuing research in India.
           </p>
-
-          <button
-            class="text-btn"
-            onclick="chooseScheme('NFST')">
+          <button class="text-btn" onclick="chooseScheme('NFST')">
             Apply for NFST →
           </button>
-
         </article>
 
-
         <article class="scheme-card">
-
           <div class="scheme-icon">🌍</div>
-
           <span class="pill">Study Abroad</span>
-
-          <h3>
-            National Overseas Scholarship
-          </h3>
-
+          <h3>National Overseas Scholarship</h3>
           <p>
             A scholarship scheme for eligible ST students pursuing
             higher studies abroad.
           </p>
-
-          <button
-            class="text-btn"
-            onclick="chooseScheme('NOS')">
+          <button class="text-btn" onclick="chooseScheme('NOS')">
             Apply for NOS →
           </button>
-
         </article>
-
       </div>
-
 
       <!-- HOW IT WORKS -->
       <section class="how-section">
-
         <div class="section-heading">
-
           <div>
             <span class="eyebrow">SIMPLE & TRANSPARENT</span>
-
             <h2>How TribalScholar Works</h2>
-
             <p class="section-subtitle">
               Your scholarship journey, simplified in four steps.
             </p>
           </div>
-
         </div>
 
-
         <div class="steps-grid">
-
           <div class="step-card">
             <div class="step-number">01</div>
             <div class="step-icon">📝</div>
             <h3>Register & Apply</h3>
-            <p>
-              Create your application and choose the scholarship scheme.
-            </p>
+            <p>Create your application and choose the scholarship scheme.</p>
           </div>
 
           <div class="step-card">
             <div class="step-number">02</div>
             <div class="step-icon">📄</div>
             <h3>Upload Documents</h3>
-            <p>
-              Submit the documents required for your selected scheme.
-            </p>
+            <p>Submit the documents required for your selected scheme.</p>
           </div>
 
           <div class="step-card">
             <div class="step-number">03</div>
             <div class="step-icon">🤖</div>
             <h3>Smart Pre-check</h3>
-            <p>
-              Check for missing information and possible document mismatches.
-            </p>
+            <p>Check for missing information and possible document mismatches.</p>
           </div>
 
           <div class="step-card">
             <div class="step-number">04</div>
             <div class="step-icon">📊</div>
             <h3>Track Progress</h3>
-            <p>
-              Follow your application status through the student portal.
-            </p>
+            <p>Follow your application status through the student portal.</p>
           </div>
-
         </div>
-
       </section>
-
 
       <!-- KEY FEATURES -->
       <section class="features-section">
-
         <div class="section-heading">
-
           <div>
             <span class="eyebrow">BUILT FOR STUDENTS</span>
             <h2>Everything in One Place</h2>
           </div>
-
         </div>
-
 
         <div class="features-grid">
-
           <div class="feature-card">
-
             <div class="feature-icon">🔍</div>
-
             <h3>Document Assistance</h3>
-
-            <p>
-              Identify missing fields and potential document issues.
-            </p>
-
+            <p>Identify missing fields and potential document issues.</p>
           </div>
 
-
           <div class="feature-card">
-
             <div class="feature-icon">⚡</div>
-
             <h3>Eligibility Pre-check</h3>
-
-            <p>
-              Check application details against configured scheme rules.
-            </p>
-
+            <p>Check application details against configured scheme rules.</p>
           </div>
 
-
           <div class="feature-card">
-
             <div class="feature-icon">🔔</div>
-
             <h3>Status Updates</h3>
-
-            <p>
-              Know whether your application is submitted,
-              under review or deficient.
-            </p>
-
+            <p>Know whether your application is submitted, under review or deficient.</p>
           </div>
-
 
           <div class="feature-card">
-
             <div class="feature-icon">🛡️</div>
-
             <h3>Responsible Review</h3>
-
-            <p>
-              Keep officers involved in document review and final decisions.
-            </p>
-
+            <p>Keep officers involved in document review and final decisions.</p>
           </div>
-
         </div>
-
       </section>
-
 
       <!-- CALL TO ACTION -->
       <section class="cta-section">
-
         <div>
-
-          <span class="eyebrow">
-            YOUR FUTURE STARTS HERE
-          </span>
-
-          <h2>
-            Take the Next Step in Your Education
-          </h2>
-
+          <span class="eyebrow">YOUR FUTURE STARTS HERE</span>
+          <h2>Take the Next Step in Your Education</h2>
           <p>
             Explore the available schemes and begin your application journey.
           </p>
-
         </div>
 
-        <button
-          class="primary-btn"
-          onclick="showPage('apply')">
+        <button class="primary-btn" onclick="showPage('apply')">
           Start Your Application →
         </button>
-
       </section>
 
-
       <div class="notice">
-
         <strong>Prototype notice:</strong>
-
         This is a student-built demonstration. Scheme details, eligibility
         rules and application statuses are sample data, not official
         government decisions.
-
       </div>
-
     </section>
-
 
     <!-- APPLICATION PAGE -->
     <section id="apply" class="page">
-
       <div class="page-heading">
-
         <span class="eyebrow">STUDENT PORTAL</span>
-
         <h1>Scholarship Application</h1>
-
-        <p>
-          Enter your details and attach the required documents.
-        </p>
-
+        <p>Enter your details and attach the required documents.</p>
       </div>
 
-
       <form id="applicationForm" class="panel">
+        <!-- STEP 1 · IDENTITY VERIFICATION -->
+        <div class="panel identity-panel">
+          <span class="eyebrow">STEP 1 · IDENTITY VERIFICATION</span>
+          <h2>Verify Your Identity</h2>
+          <p>
+            Verify your identity or fetch your documents from DigiLocker to
+            auto-fill your details and reduce manual entry errors.
+          </p>
+
+          <div class="identity-actions">
+            <button type="button" class="secondary-btn" onclick="openAadhaarModal()">
+              🪪 Verify with Aadhaar
+            </button>
+            <button type="button" class="secondary-btn" onclick="startDigiLockerVerification()">
+              🔒 Fetch via DigiLocker
+            </button>
+          </div>
+
+          <div id="identityStatus" class="identity-status hidden"></div>
+
+          <div class="notice">
+            <strong>Prototype notice:</strong> Identity verification runs in demo
+            mode (OTP: <code>123456</code>) — real eKYC requires an official
+            license. DigiLocker uses a simulated consent screen until
+            real partner credentials are configured.
+          </div>
+        </div>
+
+        <!-- Identity OTP modal -->
+        <div id="aadhaarModal" class="modal hidden">
+          <div class="modal-box">
+            <h3>Identity Verification</h3>
+            <div id="aadhaarStep1">
+              <label>12-Digit ID Number
+                <input id="aadhaarNumber" maxlength="12" placeholder="Enter 12-digit ID number">
+              </label>
+              <button type="button" class="primary-btn" onclick="requestAadhaarOtp()">Send OTP</button>
+            </div>
+            <div id="aadhaarStep2" class="hidden">
+              <label>Enter OTP
+                <input id="aadhaarOtp" maxlength="6" placeholder="6-digit OTP">
+              </label>
+              <button type="button" class="primary-btn" onclick="verifyAadhaarOtp()">Verify</button>
+            </div>
+            <button type="button" class="text-btn" onclick="closeAadhaarModal()">Cancel</button>
+          </div>
+        </div>
 
         <h2>Personal Information</h2>
 
-
         <div class="form-grid">
-
           <label>
             Full Name *
-            <input
-              id="fullName"
-              required
-              placeholder="Enter your full name">
+            <input id="fullName" name="name" required placeholder="Enter your full name">
+            <small class="field-check-note" id="check-fullName"></small>
           </label>
-
 
           <label>
             Email Address *
-            <input
-              id="email"
-              type="email"
-              required
-              placeholder="you@example.com">
+            <input id="email" name="email" type="email" required placeholder="you@example.com">
           </label>
-
 
           <label>
             Mobile Number *
-            <input
-              id="phone"
-              type="tel"
-              required
-              pattern="[0-9]{10}"
-              maxlength="10"
+            <input id="phone" name="phone" type="tel" required
+              pattern="[0-9]{10}" maxlength="10"
               placeholder="10-digit mobile number">
           </label>
 
-
           <label>
             Application Scheme *
-
-            <select id="scheme" required>
-
-              <option value="">
-                Select a scheme
-              </option>
-
-              <option value="NFST">
-                NFST — National Fellowship
-              </option>
-
-              <option value="NOS">
-                NOS — National Overseas Scholarship
-              </option>
-
+            <select id="scheme" name="scheme" required>
+              <option value="">Select a scheme</option>
+              <option value="NFST">NFST — National Fellowship</option>
+              <option value="NOS">NOS — National Overseas Scholarship</option>
             </select>
-
           </label>
-
 
           <label>
             Education Level *
-
-            <select id="education" required>
-
-              <option value="">
-                Select education level
-              </option>
-
-              <option value="Masters">
-                Master's
-              </option>
-
-              <option value="PhD">
-                PhD / Research
-              </option>
-
-              <option value="Other">
-                Other
-              </option>
-
+            <select id="education" name="education" required>
+              <option value="">Select education level</option>
+              <option value="Masters">Master's</option>
+              <option value="PhD">PhD / Research</option>
+              <option value="Other">Other</option>
             </select>
-
           </label>
-
 
           <label>
             Annual Family Income (₹) *
-
-            <input
-              id="income"
-              type="number"
-              min="0"
-              required
+            <input id="income" name="income" type="number" min="0" required
               placeholder="Enter annual income">
+            <small class="field-check-note" id="check-income"></small>
           </label>
-
 
           <label>
             Percentage / Marks *
-
-            <input
-              id="marks"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              required
-              placeholder="Enter marks or percentage">
+            <input id="marks" name="marks" type="number" min="0" max="100" step="0.01"
+              required placeholder="Enter marks or percentage">
+            <small class="field-check-note" id="check-marks"></small>
           </label>
-
 
           <label>
             Institution / University *
-
-            <input
-              id="institution"
-              required
+            <input id="institution" name="institution" required
               placeholder="Enter institution name">
           </label>
-
         </div>
 
-
         <!-- SMART APPLICATION READINESS CHECKER -->
-
         <div class="panel readiness-panel">
-
-          <span class="eyebrow">
-            SMART APPLICATION ASSISTANCE
-          </span>
-
-          <h2>
-            Application Readiness Checker
-          </h2>
+          <span class="eyebrow">SMART APPLICATION ASSISTANCE</span>
+          <h2>Application Readiness Checker</h2>
 
           <p>
             Check whether your application details and required documents
@@ -548,311 +382,199 @@
             Check My Application
           </button>
 
-          <div
-            id="readinessResult"
-            class="readiness-result"
-            aria-live="polite">
-          </div>
-
+          <div id="readinessResult" class="readiness-result" aria-live="polite"></div>
         </div>
 
-
-        <h2 class="subheading">
-          Document Upload
-        </h2>
-
+        <h2 class="subheading">Document Upload</h2>
         <p class="muted">
-          Attach the required documents. Files are securely uploaded
-          to the application's private document storage.
+          Attach the required documents. Files are analyzed with on-device OCR
+          and securely uploaded to the application's private document storage.
         </p>
 
-
         <div class="form-grid">
-
           <label>
             ST Certificate *
-
-            <input
-              id="stCertificate"
-              type="file"
-              required
-              accept=".pdf,.png,.jpg,.jpeg">
+            <input id="stCertificate" name="stCertificate" type="file" required
+              accept=".pdf,.png,.jpg,.jpeg"
+              onchange="handleDocumentOCR(this, 'stCertificate', 'ST Certificate')">
+            <div id="ocr-stCertificate" class="ocr-box hidden"></div>
           </label>
-
 
           <label>
             Marksheets / Academic Record *
-
-            <input
-              id="marksheet"
-              type="file"
-              required
-              accept=".pdf,.png,.jpg,.jpeg">
+            <input id="marksheet" name="marksheet" type="file" required
+              accept=".pdf,.png,.jpg,.jpeg"
+              onchange="handleDocumentOCR(this, 'marksheet', 'Marksheet')">
+            <div id="ocr-marksheet" class="ocr-box hidden"></div>
           </label>
-
 
           <label>
             Income Certificate *
-
-            <input
-              id="incomeCertificate"
-              type="file"
-              required
-              accept=".pdf,.png,.jpg,.jpeg">
+            <input id="incomeCertificate" name="incomeCertificate" type="file" required
+              accept=".pdf,.png,.jpg,.jpeg"
+              onchange="handleDocumentOCR(this, 'incomeCertificate', 'Income Certificate')">
+            <div id="ocr-incomeCertificate" class="ocr-box hidden"></div>
           </label>
 
-
-          <label
-            id="offerLetterField"
-            class="hidden">
-
+          <label id="offerLetterField" class="hidden">
             University Offer Letter
-
-            <input
-              id="offerLetter"
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg">
-
+            <input id="offerLetter" name="offerLetter" type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onchange="runEligibilityPreCheck()">
           </label>
-
         </div>
 
+        <!-- AI ELIGIBILITY PRE-CHECK -->
+        <div class="panel eligibility-panel">
+          <span class="eyebrow">AI ELIGIBILITY ENGINE</span>
+          <h2>Eligibility Criteria &amp; AI Cross-Verification</h2>
+          <p>
+            The system checks the selected scheme against the configured prototype criteria
+            and then cross-verifies your form values with OCR-extracted document data.
+          </p>
+          <div id="eligibilityResult" class="eligibility-result" aria-live="polite">
+            Select a scholarship scheme and complete the form to run the eligibility pre-check.
+          </div>
+        </div>
+
+        <!-- AI DOCUMENT INTELLIGENCE (OCR) SUMMARY -->
+        <div class="panel ocr-summary-panel">
+          <span class="eyebrow">AI DOCUMENT INTELLIGENCE</span>
+          <h2>OCR Extraction Summary</h2>
+          <p>
+            Fields below are read automatically from your uploaded documents
+            using on-device OCR. Please verify accuracy — OCR is not 100%
+            reliable and does not confirm document authenticity.
+          </p>
+          <div id="ocrSummary" class="ocr-summary">
+            No documents processed yet — upload a document above to run OCR.
+          </div>
+        </div>
+
+        <!-- INTELLIGENT CROSS-VERIFICATION — form data vs OCR data -->
+        <div class="panel verification-panel">
+          <span class="eyebrow">AI CROSS-VERIFICATION</span>
+          <h2>Form vs Document Verification</h2>
+          <p>
+            The AI assistant compares what you typed above with what OCR
+            read from your uploaded documents, and highlights matches
+            (green) or mismatches (red) — both on the fields themselves and
+            in the table below.
+          </p>
+          <div id="crossVerificationResult" class="cross-verification-result">
+            Upload documents and fill the form fields above to run verification.
+          </div>
+        </div>
 
         <div class="notice">
-
           <strong>Automated pre-check:</strong>
-
           The demo checks required fields and sample eligibility rules.
           It does not verify certificate authenticity or official eligibility.
-
         </div>
 
-
-        <button
-          class="primary-btn"
-          type="submit">
-
-          Check & Submit Application
-
+        <button class="primary-btn" type="submit">
+          Check &amp; Submit Application
         </button>
 
-
-        <div
-          id="formMessage"
-          class="message hidden">
-        </div>
-
+        <div id="formMessage" class="message hidden"></div>
       </form>
-
     </section>
-
 
     <!-- TRACKING PAGE -->
     <section id="track" class="page">
-
       <div class="page-heading">
-
         <span class="eyebrow">STUDENT PORTAL</span>
-
         <h1>Track Your Application</h1>
-
-        <p>
-          Enter your application ID to view its current status.
-        </p>
-
+        <p>Enter your application ID to view its current status.</p>
       </div>
-
 
       <div class="panel tracking-panel">
-
-        <form
-          id="trackForm"
-          class="track-form">
-
-          <input
-            id="trackingId"
-            required
-            placeholder="e.g. TS260001">
-
-          <button
-            class="primary-btn"
-            type="submit">
-            Track
-          </button>
-
+        <form id="trackForm" class="track-form">
+          <input id="trackingId" required placeholder="e.g. TS260001">
+          <button class="primary-btn" type="submit">Track</button>
         </form>
-
-
         <div id="trackingResult"></div>
 
-
         <!-- APPLICATION TIMELINE -->
-
-        <div
-          id="applicationTimeline"
-          class="timeline-container hidden">
-
+        <div id="applicationTimeline" class="timeline-container hidden">
           <h2>Application Timeline</h2>
-
-          <p class="muted">
-            Track the progress of your application.
-          </p>
-
+          <p class="muted">Track the progress of your application.</p>
 
           <div class="timeline">
-
-            <div
-              class="timeline-step completed"
-              data-status="Submitted">
-
+            <div class="timeline-step completed" data-status="Submitted">
               <div class="timeline-dot">✓</div>
-
               <div class="timeline-content">
-
                 <h3>Application Submitted</h3>
-
-                <p>
-                  Your application has been received.
-                </p>
-
+                <p>Your application has been received.</p>
               </div>
-
             </div>
 
-
-            <div
-              class="timeline-step"
-              data-status="Under Review">
-
+            <div class="timeline-step" data-status="Under Review">
               <div class="timeline-dot">2</div>
-
               <div class="timeline-content">
-
                 <h3>Under Review</h3>
-
-                <p>
-                  Your application is waiting for officer review.
-                </p>
-
+                <p>Your application is waiting for officer review.</p>
               </div>
-
             </div>
 
-
-            <div
-              class="timeline-step"
-              data-status="Deficient">
-
+            <div class="timeline-step" data-status="Deficient">
               <div class="timeline-dot">3</div>
-
               <div class="timeline-content">
-
                 <h3>Correction Required</h3>
-
-                <p>
-                  Please check whether additional information is required.
-                </p>
-
+                <p>Please check whether additional information is required.</p>
               </div>
-
             </div>
 
-
-            <div
-              class="timeline-step"
-              data-status="Approved">
-
+            <div class="timeline-step" data-status="Approved">
               <div class="timeline-dot">4</div>
-
               <div class="timeline-content">
-
                 <h3>Approved</h3>
-
-                <p>
-                  Your application has been marked approved in this demo.
-                </p>
-
+                <p>Your application has been marked approved in this demo.</p>
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       </div>
-
     </section>
-
 
     <!-- OFFICER PAGE -->
     <section id="admin" class="page">
-
       <div class="page-heading">
-
-        <span class="eyebrow">
-          OFFICER PORTAL · DEMO
-        </span>
-
-        <h1>
-          Application Management
-        </h1>
-
-        <p>
-          Review submitted applications and update their workflow status.
-        </p>
-
+        <span class="eyebrow">OFFICER PORTAL · DEMO</span>
+        <h1>Application Management</h1>
+        <p>Review submitted applications and update their workflow status.</p>
       </div>
 
-
       <div class="stats">
-
         <div class="stat-card">
           <span>Total applications</span>
           <strong id="adminTotal">0</strong>
         </div>
-
         <div class="stat-card">
           <span>Under review</span>
           <strong id="adminReview">0</strong>
         </div>
-
         <div class="stat-card">
           <span>Deficient</span>
           <strong id="adminDeficient">0</strong>
         </div>
-
         <div class="stat-card">
           <span>Approved in demo</span>
           <strong id="adminApproved">0</strong>
         </div>
-
       </div>
 
-
       <div class="panel">
-
         <div class="table-heading">
-
-          <h2>
-            Submitted Applications
-          </h2>
-
-          <button
-            class="secondary-btn"
-            onclick="renderAdmin()">
+          <h2>Submitted Applications</h2>
+          <button class="secondary-btn" onclick="renderAdmin()">
             Refresh
           </button>
-
         </div>
 
-
         <div class="table-wrap">
-
           <table>
-
             <thead>
-
               <tr>
                 <th>Application ID</th>
                 <th>Student</th>
@@ -861,41 +583,41 @@
                 <th>Status</th>
                 <th>Review</th>
               </tr>
-
             </thead>
-
             <tbody id="applicationsTable"></tbody>
-
           </table>
-
         </div>
-
 
         <p class="muted small">
           Demo only: status changes are not official scholarship decisions.
         </p>
-
       </div>
-
     </section>
-
   </main>
 
+  <!-- GLOBAL SMART DEFICIENCY ALERT MODAL (Accessible from Apply, Track & Admin pages) -->
+  <div id="deficiencyAlertModal" class="modal hidden">
+    <div class="modal-box deficiency-alert-box">
+      <h3>⚠ Smart Deficiency Alert</h3>
+      <p class="muted">
+        The AI assistant found an issue with this application and has
+        generated the notification below.
+      </p>
+      <div id="deficiencyAlertContent"></div>
+      <button type="button" class="primary-btn" onclick="closeDeficiencyAlertModal()">
+        Okay, I'll fix this
+      </button>
+    </div>
+  </div>
 
   <footer>
-
-    <p>
-      TribalScholar · PS 239 Prototype · For demonstration only
-    </p>
-
+    <p>TribalScholar · PS 239 Prototype · For demonstration only</p>
   </footer>
 
-
-  <!-- SUPABASE -->
+  <!-- SUPABASE SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- YOUR JAVASCRIPT -->
+  <!-- MAIN APPLICATION SCRIPT -->
   <script src="script.js"></script>
-
 </body>
 </html>
