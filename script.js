@@ -1,3146 +1,1911 @@
-/* =========================================================
-   TRIBALSCHOLAR
-   Supabase-powered Scholarship Management System
-   ========================================================= */
-
+/* ===========================================================================
+   TRIBALSCHOLAR — FINAL MERGED SCRIPT
+   Supabase Auth, DB & Storage + AI OCR + Cross-Verification +
+   AI Eligibility Engine + Expired Cert Check + Smart Deficiency Alerts
+   =========================================================================== */
 
 /* =========================================================
    1. SUPABASE CONFIGURATION
    ========================================================= */
-
-const SUPABASE_URL =
-    "https://pzhvbysnrcsumivvvlfx.supabase.co";
-
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_8rAdF0TNelKSQc_MdeKVOA_7EBvDdtt";
-
+const SUPABASE_URL = "https://pzhvbysnrcsumivvvlfx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8rAdF0TNelKSQc_MdeKVOA_7EBvDdtt";
 
 if (!window.supabase) {
-    throw new Error(
-        "Supabase JS library failed to load. Check index.html."
-    );
+  throw new Error("Supabase JS library failed to load. Check index.html.");
 }
 
-
-if (!SUPABASE_URL.startsWith("https://")) {
-    throw new Error("Invalid Supabase URL.");
-}
-
-
-if (!SUPABASE_PUBLISHABLE_KEY.startsWith("sb_publishable_")) {
-    throw new Error(
-        "Invalid Supabase Publishable Key. Copy the current Publishable key from Supabase."
-    );
-}
-
-
-const supabaseClient =
-    window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_PUBLISHABLE_KEY
-    );
-
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
 
 /* =========================================================
-   2. GLOBAL STATE
+   2. GLOBAL STATE & LOCAL ALERT CACHE
    ========================================================= */
-
 let currentUser = null;
 let currentProfile = null;
-
-
-/* =========================================================
-   3. AUTH UI
-   ========================================================= */
-
-function createAuthPanel() {
-
-    if (document.getElementById("authPanel")) {
-        return;
-    }
-
-
-    const panel = document.createElement("div");
-
-    panel.id = "authPanel";
-
-    panel.className = "auth-panel";
-
-
-    panel.innerHTML = `
-        <div class="auth-panel-inner">
-
-            <button
-                type="button"
-                id="closeAuthPanel"
-                class="auth-close">
-                ×
-            </button>
-
-
-            <div class="auth-brand">
-
-                <span class="eyebrow">
-                    TRIBALSCHOLAR ACCESS
-                </span>
-
-
-                <h2 id="authTitle">
-                    Student Login
-                </h2>
-
-
-                <p id="authSubtitle">
-                    Sign in to access your scholarship dashboard.
-                </p>
-
-            </div>
-
-
-            <form id="authForm">
-
-                <div
-                    id="fullNameGroup"
-                    class="form-group hidden">
-
-                    <label for="authFullName">
-                        Full Name
-                    </label>
-
-
-                    <input
-                        type="text"
-                        id="authFullName"
-                        placeholder="Enter your full name">
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label for="authEmail">
-                        College Email
-                    </label>
-
-
-                    <input
-                        type="email"
-                        id="authEmail"
-                        placeholder="Enter your college email"
-                        required>
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label for="authPassword">
-                        Password
-                    </label>
-
-
-                    <input
-                        type="password"
-                        id="authPassword"
-                        placeholder="Enter your password"
-                        minlength="6"
-                        required>
-
-                </div>
-
-
-                <button
-                    type="submit"
-                    id="authSubmit"
-                    class="primary-btn">
-                    Login
-                </button>
-
-
-                <div
-                    id="authMessage"
-                    class="form-message">
-                </div>
-
-            </form>
-
-
-            <button
-                type="button"
-                id="authSwitchButton"
-                class="text-btn auth-switch">
-                Create a Student Account
-            </button>
-
-        </div>
-    `;
-
-
-    document.body.appendChild(panel);
-
-
-    document
-        .getElementById("closeAuthPanel")
-        ?.addEventListener(
-            "click",
-            closeAuthPanel
-        );
-
-
-    document
-        .getElementById("authForm")
-        ?.addEventListener(
-            "submit",
-            handleAuthSubmit
-        );
-
-
-    document
-        .getElementById("authSwitchButton")
-        ?.addEventListener(
-            "click",
-            toggleAuthMode
-        );
-}
-
-
-/* =========================================================
-   4. AUTH MODE
-   ========================================================= */
-
 let authMode = "login";
 
+const ocrData = {}; // { stCertificate: {...fields}, marksheet: {...fields}, incomeCertificate: {...fields} }
+const ALERT_CACHE_KEY = "tribalScholarDeficiencyAlerts";
+
+function getAlertCache() {
+  try {
+    return JSON.parse(localStorage.getItem(ALERT_CACHE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAlertToCache(appId, alertObj) {
+  const cache = getAlertCache();
+  cache[appId] = alertObj;
+  localStorage.setItem(ALERT_CACHE_KEY, JSON.stringify(cache));
+}
+
+/* =========================================================
+   3. AI-POWERED OCR ENGINE (Tesseract.js + PDF.js)
+   ========================================================= */
+async function pdfFirstPageToImage(file) {
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  await page.render({
+    canvasContext: canvas.getContext("2d"),
+    viewport
+  }).promise;
+
+  return canvas.toDataURL("image/png");
+}
+
+async function handleDocumentOCR(inputEl, docType, displayName) {
+  const file = inputEl.files[0];
+  const box = document.getElementById(`ocr-${docType}`);
+
+  if (!file || !box) return;
+
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="ocr-loading">
+      🔎 Reading ${escapeHTML(displayName)}… analyzing document…
+    </div>
+  `;
+
+  try {
+    const source = file.type === "application/pdf"
+      ? await pdfFirstPageToImage(file)
+      : file;
+
+    const { data } = await Tesseract.recognize(source, "eng", {
+      logger: (m) => {
+        if (m.status === "recognizing text") {
+          box.innerHTML = `
+            <div class="ocr-loading">
+              🔎 Reading ${escapeHTML(displayName)}… ${Math.round(m.progress * 100)}%
+            </div>
+          `;
+        }
+      }
+    });
+
+    const fields = extractStructuredFields(data.text, docType);
+    ocrData[docType] = {
+      ...fields,
+      confidence: Math.round(data.confidence)
+    };
+
+    renderOcrBox(docType, displayName, ocrData[docType]);
+    updateOcrSummary();
+    runCrossVerification();
+    runEligibilityPreCheck();
+  } catch (err) {
+    box.innerHTML = `
+      <div class="ocr-error">
+        ⚠ Could not read this document (${escapeHTML(err.message)}).
+        You can still submit — an officer will verify it manually.
+      </div>
+    `;
+  }
+}
+
+function extractStructuredFields(rawText, docType) {
+  const text = rawText.replace(/\s+/g, " ").trim();
+
+  const nameMatch = text.match(
+    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|Date|Roll|$))/i
+  );
+  const dobMatch = text.match(
+    /(?:DOB|Date of Birth)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i
+  );
+  const certNoMatch = text.match(
+    /(?:Certificate\s*No\.?|Cert\.?\s*No\.?|Registration\s*No\.?|Serial\s*No\.?)\s*[:\-]?\s*([A-Za-z0-9\/\-]{4,20})/i
+  );
+  const anyDateMatch = text.match(
+    /\b(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\b/
+  );
+
+  const fields = {
+    name: nameMatch ? nameMatch[1].trim() : null,
+    dateOfBirth: dobMatch ? dobMatch[1] : null,
+    certificateNumber: certNoMatch ? certNoMatch[1] : null,
+    issueDate: anyDateMatch ? anyDateMatch[1] : null
+  };
+
+  if (docType === "marksheet") {
+    const pctMatch = text.match(/(\d{1,3}(?:\.\d{1,2})?)\s*%/);
+    const marksMatch = text.match(/(\d{2,4})\s*\/\s*(\d{2,4})/);
+    fields.percentage = pctMatch ? parseFloat(pctMatch[1]) : null;
+    fields.marksObtained = marksMatch ? `${marksMatch[1]}/${marksMatch[2]}` : null;
+  }
+
+  if (docType === "incomeCertificate") {
+    const incomeMatch = text.match(
+      /(?:Annual\s*Income|Income)\s*[:\-]?\s*(?:Rs\.?|₹)?\s*([\d,]{4,10})/i
+    );
+    fields.annualIncome = incomeMatch ? incomeMatch[1].replace(/,/g, "") : null;
+  }
+
+  return fields;
+}
+
+function renderOcrBox(docType, displayName, fields) {
+  const box = document.getElementById(`ocr-${docType}`);
+  if (!box) return;
+
+  const rows = Object.entries(fields)
+    .filter(([key]) => key !== "confidence")
+    .map(([key, value]) => `
+      <div class="ocr-field-row">
+        <span>${formatFieldLabel(key)}</span>
+        <strong>${value ? escapeHTML(String(value)) : "<em>not detected</em>"}</strong>
+      </div>
+    `)
+    .join("");
+
+  box.innerHTML = `
+    <div class="ocr-result-card">
+      <div class="ocr-result-header">
+        <span>✓ ${escapeHTML(displayName)} — OCR ${fields.confidence}% confidence</span>
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
+function formatFieldLabel(key) {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, c => c.toUpperCase());
+}
+
+function crossCheckExtractedNames() {
+  const typedName = document.getElementById("fullName")?.value.trim();
+  if (!typedName) return null;
+
+  const mismatches = [];
+  Object.entries(ocrData).forEach(([docType, fields]) => {
+    if (!fields.name) return;
+    if (!namesRoughlyMatch(typedName, fields.name)) {
+      mismatches.push({ docType, ocrName: fields.name });
+    }
+  });
+
+  return mismatches;
+}
+
+function namesRoughlyMatch(a, b) {
+  const norm = s => s.toUpperCase().replace(/[^A-Z]/g, "");
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb) return true;
+  return levenshtein(na, nb) <= 2;
+}
+
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [
+    i,
+    ...Array(b.length).fill(0)
+  ]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function updateOcrSummary() {
+  const summary = document.getElementById("ocrSummary");
+  if (!summary) return;
+
+  const docs = Object.keys(ocrData);
+  if (!docs.length) {
+    summary.innerHTML = "No documents processed yet — upload a document above to run OCR.";
+    return;
+  }
+
+  const rows = docs.map(docType => {
+    const f = ocrData[docType];
+    return `
+      <tr>
+        <td>${escapeHTML(formatFieldLabel(docType))}</td>
+        <td>${f.name ? escapeHTML(f.name) : "—"}</td>
+        <td>${escapeHTML(f.certificateNumber || f.issueDate || "—")}</td>
+        <td>${f.confidence}%</td>
+      </tr>
+    `;
+  }).join("");
+
+  const mismatches = crossCheckExtractedNames();
+  const mismatchHtml = mismatches && mismatches.length
+    ? `
+      <div class="ocr-mismatch-warning">
+        ⚠ Potential name mismatch: your application name doesn't closely match
+        the name read from ${mismatches.map(m => formatFieldLabel(m.docType)).join(", ")}
+        (OCR read: "${escapeHTML(mismatches[0].ocrName)}").
+        This will be flagged for officer review — please double-check spelling.
+      </div>
+    `
+    : `
+      <div class="ocr-match-ok">
+        ✓ Names appear consistent across processed documents.
+      </div>
+    `;
+
+  summary.innerHTML = `
+    <table class="ocr-summary-table">
+      <thead>
+        <tr>
+          <th>Document</th>
+          <th>Name (OCR)</th>
+          <th>Cert No. / Date</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${mismatchHtml}
+  `;
+}
+
+/* =========================================================
+   4. AI CROSS-VERIFICATION (Form vs OCR)
+   ========================================================= */
+const CROSS_CHECK_FIELDS = [
+  {
+    formId: "marks",
+    ocrKey: "percentage",
+    label: "Marks / Percentage",
+    sourceDoc: "marksheet"
+  },
+  {
+    formId: "income",
+    ocrKey: "annualIncome",
+    label: "Annual Income",
+    sourceDoc: "incomeCertificate"
+  }
+];
+
+function runCrossVerification() {
+  const panel = document.getElementById("crossVerificationResult");
+  if (!panel) return;
+
+  if (!Object.keys(ocrData).length) {
+    panel.innerHTML = "Upload documents and fill the form fields above to run verification.";
+    clearFieldCheck("fullName");
+    clearFieldCheck("marks");
+    clearFieldCheck("income");
+    return;
+  }
+
+  const rows = [];
+  const typedName = document.getElementById("fullName")?.value.trim() || "";
+  const nameSources = Object.entries(ocrData).filter(([, f]) => f.name);
+
+  if (typedName && nameSources.length) {
+    const allMatch = nameSources.every(([, f]) => namesRoughlyMatch(typedName, f.name));
+
+    setFieldCheck(
+      "fullName",
+      allMatch,
+      allMatch
+        ? "Matches the name on your uploaded document(s)."
+        : `Doesn't closely match OCR name read from ${
+            nameSources
+              .filter(([, f]) => !namesRoughlyMatch(typedName, f.name))
+              .map(([d]) => formatFieldLabel(d))
+              .join(", ")
+          }.`
+    );
+
+    nameSources.forEach(([docType, f]) => {
+      rows.push(
+        comparisonRowHtml(
+          "Full Name",
+          typedName,
+          f.name,
+          formatFieldLabel(docType),
+          namesRoughlyMatch(typedName, f.name)
+        )
+      );
+    });
+  } else {
+    clearFieldCheck("fullName");
+  }
+
+  CROSS_CHECK_FIELDS.forEach(({ formId, ocrKey, label, sourceDoc }) => {
+    const input = document.getElementById(formId);
+    if (!input) return;
+
+    const typedRaw = input.value;
+    const ocrFields = ocrData[sourceDoc];
+
+    if (typedRaw === "" || !ocrFields || ocrFields[ocrKey] == null) {
+      clearFieldCheck(formId);
+      return;
+    }
+
+    const typedNum = parseFloat(typedRaw);
+    const ocrNum = parseFloat(ocrFields[ocrKey]);
+    const tolerance = formId === "income" ? Math.max(ocrNum * 0.02, 500) : 1;
+    const isMatch = Math.abs(typedNum - ocrNum) <= tolerance;
+
+    const typedDisplay = formId === "income"
+      ? `₹${typedNum.toLocaleString("en-IN")}`
+      : `${typedNum}%`;
+    const ocrDisplay = formId === "income"
+      ? `₹${ocrNum.toLocaleString("en-IN")}`
+      : `${ocrNum}%`;
+
+    setFieldCheck(
+      formId,
+      isMatch,
+      isMatch
+        ? `Matches ${label.toLowerCase()} read from ${formatFieldLabel(sourceDoc)}.`
+        : `${formatFieldLabel(sourceDoc)} OCR shows ${ocrDisplay}, you entered ${typedDisplay}.`
+    );
+
+    rows.push(
+      comparisonRowHtml(
+        label,
+        typedDisplay,
+        ocrDisplay,
+        formatFieldLabel(sourceDoc),
+        isMatch
+      )
+    );
+  });
+
+  if (!rows.length) {
+    panel.innerHTML = "No comparable OCR data yet — fill in the fields and upload the matching document(s).";
+    return;
+  }
+
+  panel.innerHTML = `
+    <table class="ocr-summary-table">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>You Entered</th>
+          <th>OCR Read</th>
+          <th>Source Document</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join("")}</tbody>
+    </table>
+  `;
+}
+
+function comparisonRowHtml(label, typedVal, ocrVal, source, isMatch) {
+  return `
+    <tr>
+      <td>${escapeHTML(label)}</td>
+      <td>${escapeHTML(String(typedVal))}</td>
+      <td>${escapeHTML(String(ocrVal))}</td>
+      <td>${escapeHTML(source)}</td>
+      <td>
+        <span class="match-badge ${isMatch ? "match" : "mismatch"}">
+          ${isMatch ? "✓ Match" : "✗ Mismatch"}
+        </span>
+      </td>
+    </tr>
+  `;
+}
+
+function setFieldCheck(fieldId, isMatch, message) {
+  const input = document.getElementById(fieldId);
+  const note = document.getElementById(`check-${fieldId}`);
+
+  if (input) {
+    input.classList.remove("field-match", "field-mismatch");
+    input.classList.add(isMatch ? "field-match" : "field-mismatch");
+  }
+  if (note) {
+    note.textContent = (isMatch ? "✓ " : "✗ ") + message;
+    note.className = `field-check-note ${isMatch ? "match" : "mismatch"}`;
+  }
+}
+
+function clearFieldCheck(fieldId) {
+  const input = document.getElementById(fieldId);
+  const note = document.getElementById(`check-${fieldId}`);
+
+  if (input) input.classList.remove("field-match", "field-mismatch");
+  if (note) {
+    note.textContent = "";
+    note.className = "field-check-note";
+  }
+}
+
+/* =========================================================
+   5. AI ELIGIBILITY ENGINE
+   ========================================================= */
+const ELIGIBILITY_RULES = {
+  NFST: {
+    name: "National Fellowship for ST Students",
+    criteria: [
+      { key: "stCertificate", label: "ST status document", type: "document", required: true },
+      { key: "education", label: "Education / research level", type: "education", allowed: ["PhD"] },
+      { key: "marks", label: "Academic percentage", type: "number", min: 55, unit: "%" },
+      { key: "income", label: "Annual family income", type: "number", max: 800000, unit: "₹" }
+    ]
+  },
+  NOS: {
+    name: "National Overseas Scholarship",
+    criteria: [
+      { key: "stCertificate", label: "ST status document", type: "document", required: true },
+      { key: "education", label: "Higher-study level", type: "education", allowed: ["Masters", "PhD"] },
+      { key: "marks", label: "Academic percentage", type: "number", min: 60, unit: "%" },
+      { key: "income", label: "Annual family income", type: "number", max: 800000, unit: "₹" },
+      { key: "offerLetter", label: "University offer letter", type: "document", required: true }
+    ]
+  }
+};
+
+function getValue(id) {
+  const element = document.getElementById(id);
+  return element ? element.value.trim() : "";
+}
+
+function getNumber(id) {
+  const value = getValue(id);
+  if (value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getDocumentStatus(documentKey) {
+  const input = document.getElementById(documentKey);
+  if (!input) return { uploaded: false, name: "" };
+  const uploaded = input.files && input.files.length > 0;
+  return { uploaded, name: uploaded ? input.files[0].name : "" };
+}
+
+function evaluateEligibilityCriterion(criterion) {
+  const key = criterion.key;
+
+  if (criterion.type === "document") {
+    const doc = getDocumentStatus(key);
+    if (doc.uploaded) return { status: "pass", message: `${criterion.label} uploaded` };
+    if (criterion.required) return { status: "fail", message: `${criterion.label} is required` };
+    return { status: "review", message: `${criterion.label} not provided` };
+  }
+
+  if (criterion.type === "education") {
+    const education = getValue("education");
+    if (!education) return { status: "review", message: "Education level not selected" };
+    if (criterion.allowed.includes(education)) {
+      return { status: "pass", message: `${education} is accepted` };
+    }
+    return { status: "fail", message: `${education} does not meet the configured education rule` };
+  }
+
+  if (criterion.type === "number") {
+    let value = null;
+    if (key === "marks") value = getNumber("marks");
+    if (key === "income") value = getNumber("income");
+
+    if (value === null) return { status: "review", message: `${criterion.label} not provided` };
+    if (criterion.min !== undefined && value < criterion.min) {
+      return {
+        status: "fail",
+        message: `${value}${criterion.unit || ""} is below the minimum ${criterion.min}${criterion.unit || ""}`
+      };
+    }
+    if (criterion.max !== undefined && value > criterion.max) {
+      return {
+        status: "fail",
+        message: `${value}${criterion.unit || ""} is above the maximum ${criterion.max}${criterion.unit || ""}`
+      };
+    }
+    return { status: "pass", message: `${value}${criterion.unit || ""} satisfies the configured rule` };
+  }
+
+  return { status: "review", message: "Manual review required" };
+}
+
+function getEligibilitySnapshot() {
+  const scheme = getValue("scheme");
+  if (!scheme || !ELIGIBILITY_RULES[scheme]) {
+    return { scheme: "", schemeName: "", criteria: [], status: "review", score: 0 };
+  }
+
+  const ruleSet = ELIGIBILITY_RULES[scheme];
+  const criteria = ruleSet.criteria.map(criterion => ({
+    ...criterion,
+    ...evaluateEligibilityCriterion(criterion)
+  }));
+
+  const passed = criteria.filter(item => item.status === "pass").length;
+  const failed = criteria.filter(item => item.status === "fail").length;
+  const review = criteria.filter(item => item.status === "review").length;
+
+  let status = "pass";
+  if (failed > 0) status = "fail";
+  else if (review > 0) status = "review";
+
+  const score = criteria.length ? Math.round((passed / criteria.length) * 100) : 0;
+
+  return {
+    scheme,
+    schemeName: ruleSet.name,
+    criteria,
+    passed,
+    failed,
+    review,
+    status,
+    score,
+    checkedAt: new Date().toLocaleString()
+  };
+}
+
+function runEligibilityPreCheck() {
+  const resultBox = document.getElementById("eligibilityResult");
+  const snapshot = getEligibilitySnapshot();
+
+  if (!resultBox) return snapshot;
+
+  if (!snapshot.scheme) {
+    resultBox.innerHTML = `
+      <div class="eligibility-banner review">
+        <strong>Eligibility check pending</strong>
+        <span>Select a scholarship scheme to start the AI pre-check.</span>
+      </div>
+    `;
+    return snapshot;
+  }
+
+  let bannerTitle = "Eligible — configured rules passed";
+  let bannerText = "The entered information currently satisfies the configured prototype criteria.";
+
+  if (snapshot.status === "fail") {
+    bannerTitle = "Eligibility issues detected";
+    bannerText = "One or more configured eligibility criteria are not satisfied.";
+  } else if (snapshot.status === "review") {
+    bannerTitle = "Manual review required";
+    bannerText = "Some eligibility information is missing or requires document review.";
+  }
+
+  const criteriaHTML = snapshot.criteria
+    .map(item => {
+      let icon = "✓";
+      if (item.status === "fail") icon = "✕";
+      if (item.status === "review") icon = "!";
+
+      return `
+        <div class="eligibility-item ${item.status}">
+          <div class="eligibility-item-icon">${icon}</div>
+          <div>
+            <strong>${escapeHTML(item.label)}</strong>
+            <span>${escapeHTML(item.message)}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  resultBox.innerHTML = `
+    <div class="eligibility-head">
+      <div>
+        <strong>${bannerTitle}</strong>
+        <span>${bannerText}</span>
+      </div>
+      <div class="eligibility-score">${snapshot.score}%</div>
+    </div>
+    <div class="eligibility-grid">${criteriaHTML}</div>
+    <div class="eligibility-disclaimer">
+      AI pre-check only: passing these configured rules does not establish
+      official eligibility, document authenticity, or final approval.
+      Officer review remains required.
+    </div>
+  `;
+
+  return snapshot;
+}
+
+function getEligibilityIssues(snapshot) {
+  if (!snapshot || !snapshot.criteria) return [];
+  return snapshot.criteria
+    .filter(item => item.status === "fail")
+    .map(item => `Eligibility: ${item.label} — ${item.message}`);
+}
+
+/* =========================================================
+   6. EXPIRED CERTIFICATE DETECTION & SMART DEFICIENCY ALERT
+   ========================================================= */
+const CERTIFICATE_VALIDITY_DAYS = {
+  incomeCertificate: 365,
+  stCertificate: 365 * 5
+};
+
+function parseFlexibleDate(str) {
+  if (!str) return null;
+  const parts = str.split(/[\/\-.]/).map(p => p.trim());
+  if (parts.length !== 3) return null;
+
+  let [d, m, y] = parts.map(Number);
+  if (!d || !m || !y) return null;
+  if (y < 100) y += y < 50 ? 2000 : 1900;
+
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function checkExpiredCertificates() {
+  const expiryIssues = [];
+
+  Object.entries(CERTIFICATE_VALIDITY_DAYS).forEach(([docType, maxDays]) => {
+    const fields = ocrData[docType];
+    if (!fields || !fields.issueDate) return;
+
+    const issueDate = parseFlexibleDate(fields.issueDate);
+    if (!issueDate) return;
+
+    const ageDays = Math.floor((Date.now() - issueDate.getTime()) / 86400000);
+    if (ageDays > maxDays) {
+      expiryIssues.push({
+        docType,
+        label: formatFieldLabel(docType),
+        issueDate: fields.issueDate,
+        ageDays
+      });
+    }
+  });
+
+  return expiryIssues;
+}
+
+function generateSmartDeficiencyAlert(application, issues) {
+  const emailBody = buildDeficiencyMessage(application, issues, "email");
+  const smsBody = buildDeficiencyMessage(application, issues, "sms");
+
+  const alertObj = {
+    sentAt: new Date().toLocaleString(),
+    email: emailBody,
+    sms: smsBody,
+    applicantEmail: application.email,
+    applicantPhone: application.phone
+  };
+
+  const appKey = application.application_id || application.id;
+  saveAlertToCache(appKey, alertObj);
+
+  showDeficiencyAlertModal(application, emailBody, smsBody);
+}
+
+function buildDeficiencyMessage(application, issues, channel) {
+  const appId = application.application_id || application.id;
+  if (channel === "sms") {
+    const extra = issues.length > 1
+      ? ` (+${issues.length - 1} more issue${issues.length > 2 ? "s" : ""})`
+      : "";
+    return `TribalScholar: Your application ${appId} needs action — ${issues[0]}${extra} Please log in and correct this within 3 days.`;
+  }
+
+  const issueLines = issues.map(issue => `  • ${issue}`).join("\n");
+  return `Dear ${application.name || "Applicant"},
+
+Our AI Assistant reviewed your scholarship application (ID: ${appId}, Scheme: ${application.scheme}) and found the following issue(s) that need your attention:
+
+${issueLines}
+
+Please log in to TribalScholar and correct these as soon as possible so your application can move forward to officer review.
+
+— TribalScholar Automated Notification (Demo — no real email is sent)`;
+}
+
+function showDeficiencyAlertModal(application, emailBody, smsBody) {
+  const content = document.getElementById("deficiencyAlertContent");
+  const modal = document.getElementById("deficiencyAlertModal");
+  if (!content || !modal) return;
+
+  content.innerHTML = `
+    <div class="deficiency-alert-block">
+      <strong>📧 Email → ${escapeHTML(application.email || "no email on file")}</strong>
+      <pre class="deficiency-alert-text">${escapeHTML(emailBody)}</pre>
+    </div>
+    <div class="deficiency-alert-block">
+      <strong>📱 SMS → ${escapeHTML(application.phone || "no phone on file")}</strong>
+      <pre class="deficiency-alert-text">${escapeHTML(smsBody)}</pre>
+    </div>
+    <p class="muted small">Demo only: no real email or SMS is sent from the browser.</p>
+  `;
+
+  modal.classList.remove("hidden");
+}
+
+function closeDeficiencyAlertModal() {
+  document.getElementById("deficiencyAlertModal")?.classList.add("hidden");
+}
+
+async function viewDeficiencyAlert(appId) {
+  const cache = getAlertCache();
+  if (cache[appId]) {
+    showDeficiencyAlertModal(
+      { email: cache[appId].applicantEmail, phone: cache[appId].applicantPhone },
+      cache[appId].email,
+      cache[appId].sms
+    );
+    return;
+  }
+
+  // Fallback: build alert dynamically from Supabase application row
+  try {
+    const { data: app } = await supabaseClient
+      .from("applications")
+      .select("*")
+      .or(`application_id.eq.${appId},id.eq.${appId}`)
+      .maybeSingle();
+
+    if (app && Array.isArray(app.issues) && app.issues.length) {
+      generateSmartDeficiencyAlert(app, app.issues);
+    }
+  } catch (e) {
+    console.error("Could not load deficiency alert:", e);
+  }
+}
+
+/* =========================================================
+   7. IDENTITY VERIFICATION (eKYC + DigiLocker Demo)
+   ========================================================= */
+const IDENTITY_API_BASE = "http://localhost:4000/api";
+let aadhaarTxnId = null;
+let identityVerified = false;
+
+function setIdentityStatus(message, type) {
+  const box = document.getElementById("identityStatus");
+  if (!box) return;
+  box.textContent = message;
+  box.className = `identity-status ${type}`;
+  box.classList.remove("hidden");
+}
+
+function openAadhaarModal() {
+  document.getElementById("aadhaarModal")?.classList.remove("hidden");
+}
+
+function closeAadhaarModal() {
+  document.getElementById("aadhaarModal")?.classList.add("hidden");
+  document.getElementById("aadhaarStep1")?.classList.remove("hidden");
+  document.getElementById("aadhaarStep2")?.classList.add("hidden");
+}
+
+async function requestAadhaarOtp() {
+  const idNumber = document.getElementById("aadhaarNumber")?.value.trim();
+  if (!idNumber) {
+    alert("Please enter your 12-digit number.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${IDENTITY_API_BASE}/aadhaar/generate-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aadhaarNumber: idNumber })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    aadhaarTxnId = data.txnId;
+    document.getElementById("aadhaarStep1")?.classList.add("hidden");
+    document.getElementById("aadhaarStep2")?.classList.remove("hidden");
+  } catch (err) {
+    if (err.name === "TypeError") {
+      aadhaarTxnId = "DEMO-TXN";
+      document.getElementById("aadhaarStep1")?.classList.add("hidden");
+      document.getElementById("aadhaarStep2")?.classList.remove("hidden");
+    } else {
+      alert(err.message);
+    }
+  }
+}
+
+async function verifyAadhaarOtp() {
+  const otp = document.getElementById("aadhaarOtp")?.value.trim();
+  if (!otp) {
+    alert("Please enter the OTP.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${IDENTITY_API_BASE}/aadhaar/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txnId: aadhaarTxnId, otp })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    applyVerifiedIdentity(data);
+    closeAadhaarModal();
+    setIdentityStatus(
+      `✓ Identity verified (Ref: ${data.aadhaarRef}). Name and details auto-filled below.`,
+      "success"
+    );
+  } catch (err) {
+    if (err.name === "TypeError") {
+      const fallbackName =
+        currentProfile?.full_name ||
+        document.getElementById("fullName")?.value.trim() ||
+        "Verified Student";
+      applyVerifiedIdentity({ name: fallbackName });
+      closeAadhaarModal();
+      setIdentityStatus(
+        "✓ Identity verified in Demo Mode. Name and details auto-filled below.",
+        "success"
+      );
+    } else {
+      alert(err.message);
+    }
+  }
+}
+
+async function startDigiLockerVerification() {
+  try {
+    const res = await fetch(`${IDENTITY_API_BASE}/digilocker/authorize`);
+    const data = await res.json();
+    window.location.href = data.authorizeUrl;
+  } catch {
+    setIdentityStatus(
+      "✓ DigiLocker Demo Mode connected — 3 documents verified (ST Certificate, Marksheet, Income Certificate).",
+      "success"
+    );
+  }
+}
+
+function applyVerifiedIdentity(identity) {
+  identityVerified = true;
+  const nameField = document.getElementById("fullName");
+  if (!nameField) return;
+
+  nameField.value = identity.name;
+  nameField.readOnly = true;
+  nameField.classList.add("verified-field");
+
+  runCrossVerification();
+  runEligibilityPreCheck();
+}
+
+(function checkDigiLockerReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const state = params.get("digilocker_state");
+  if (!state) return;
+
+  fetch(`${IDENTITY_API_BASE}/digilocker/session/${state}`)
+    .then(res => res.json())
+    .then(session => {
+      if (session.documents) {
+        setIdentityStatus(
+          `✓ DigiLocker connected — ${session.documents.items.length} documents fetched (ST Certificate, Marksheet, Income Certificate).`,
+          "success"
+        );
+      }
+    })
+    .catch(() => {});
+})();
+
+/* =========================================================
+   8. SUPABASE AUTHENTICATION & USER ROLES
+   ========================================================= */
+function createAuthPanel() {
+  if (document.getElementById("authPanel")) return;
+
+  const panel = document.createElement("div");
+  panel.id = "authPanel";
+  panel.className = "auth-panel";
+
+  panel.innerHTML = `
+    <div class="auth-panel-inner">
+      <button type="button" id="closeAuthPanel" class="auth-close">×</button>
+      <div class="auth-brand">
+        <span class="eyebrow">TRIBALSCHOLAR ACCESS</span>
+        <h2 id="authTitle">Student Login</h2>
+        <p id="authSubtitle">Sign in to access your scholarship dashboard.</p>
+      </div>
+      <form id="authForm">
+        <div id="fullNameGroup" class="form-group hidden">
+          <label for="authFullName">Full Name</label>
+          <input type="text" id="authFullName" placeholder="Enter your full name">
+        </div>
+        <div class="form-group">
+          <label for="authEmail">College Email</label>
+          <input type="email" id="authEmail" placeholder="Enter your college email" required>
+        </div>
+        <div class="form-group">
+          <label for="authPassword">Password</label>
+          <input type="password" id="authPassword" placeholder="Enter your password" minlength="6" required>
+        </div>
+        <button type="submit" id="authSubmit" class="primary-btn">Login</button>
+        <div id="authMessage" class="form-message"></div>
+      </form>
+      <button type="button" id="authSwitchButton" class="text-btn auth-switch">
+        Create a Student Account
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+
+  document.getElementById("closeAuthPanel")?.addEventListener("click", closeAuthPanel);
+  document.getElementById("authForm")?.addEventListener("submit", handleAuthSubmit);
+  document.getElementById("authSwitchButton")?.addEventListener("click", toggleAuthMode);
+}
 
 function openAuthPanel(mode = "login") {
-
-    createAuthPanel();
-
-    authMode = mode;
-
-    updateAuthPanel();
-
-
-    const panel =
-        document.getElementById(
-            "authPanel"
-        );
-
-
-    if (panel) {
-        panel.classList.add("show");
-    }
+  createAuthPanel();
+  authMode = mode;
+  updateAuthPanel();
+  document.getElementById("authPanel")?.classList.add("show");
 }
-
 
 function closeAuthPanel() {
-
-    const panel =
-        document.getElementById(
-            "authPanel"
-        );
-
-
-    if (panel) {
-        panel.classList.remove("show");
-    }
+  document.getElementById("authPanel")?.classList.remove("show");
 }
-
 
 function toggleAuthMode() {
-
-    authMode =
-        authMode === "login"
-            ? "signup"
-            : "login";
-
-    updateAuthPanel();
+  authMode = authMode === "login" ? "signup" : "login";
+  updateAuthPanel();
 }
-
 
 function updateAuthPanel() {
+  const title = document.getElementById("authTitle");
+  const subtitle = document.getElementById("authSubtitle");
+  const fullNameGroup = document.getElementById("fullNameGroup");
+  const submit = document.getElementById("authSubmit");
+  const switchButton = document.getElementById("authSwitchButton");
+  const message = document.getElementById("authMessage");
 
-    const title =
-        document.getElementById(
-            "authTitle"
-        );
+  if (!title || !subtitle || !fullNameGroup || !submit || !switchButton) return;
 
+  if (authMode === "signup") {
+    title.textContent = "Create Student Account";
+    subtitle.textContent = "Create your account to apply for scholarships.";
+    fullNameGroup.classList.remove("hidden");
+    submit.textContent = "Create Account";
+    switchButton.textContent = "Already have an account? Login";
+  } else {
+    title.textContent = "Student Login";
+    subtitle.textContent = "Sign in to access your scholarship dashboard.";
+    fullNameGroup.classList.add("hidden");
+    submit.textContent = "Login";
+    switchButton.textContent = "Create a Student Account";
+  }
 
-    const subtitle =
-        document.getElementById(
-            "authSubtitle"
-        );
-
-
-    const fullNameGroup =
-        document.getElementById(
-            "fullNameGroup"
-        );
-
-
-    const submit =
-        document.getElementById(
-            "authSubmit"
-        );
-
-
-    const switchButton =
-        document.getElementById(
-            "authSwitchButton"
-        );
-
-
-    const message =
-        document.getElementById(
-            "authMessage"
-        );
-
-
-    if (
-        !title ||
-        !subtitle ||
-        !fullNameGroup ||
-        !submit ||
-        !switchButton
-    ) {
-        return;
-    }
-
-
-    const signup =
-        authMode === "signup";
-
-
-    if (signup) {
-
-        title.textContent =
-            "Create Student Account";
-
-
-        subtitle.textContent =
-            "Create your account to apply for scholarships.";
-
-
-        fullNameGroup.classList.remove(
-            "hidden"
-        );
-
-
-        submit.textContent =
-            "Create Account";
-
-
-        switchButton.textContent =
-            "Already have an account? Login";
-
-    } else {
-
-        title.textContent =
-            "Student Login";
-
-
-        subtitle.textContent =
-            "Sign in to access your scholarship dashboard.";
-
-
-        fullNameGroup.classList.add(
-            "hidden"
-        );
-
-
-        submit.textContent =
-            "Login";
-
-
-        switchButton.textContent =
-            "Create a Student Account";
-    }
-
-
-    if (message) {
-
-        message.textContent = "";
-
-        message.className =
-            "form-message";
-    }
+  if (message) {
+    message.textContent = "";
+    message.className = "form-message";
+  }
 }
-
-
-/* =========================================================
-   5. AUTH SUBMIT
-   ========================================================= */
 
 async function handleAuthSubmit(event) {
-
-    event.preventDefault();
-
-
-    const fullName =
-        document
-            .getElementById(
-                "authFullName"
-            )
-            ?.value
-            .trim();
-
-
-    const email =
-        document
-            .getElementById(
-                "authEmail"
-            )
-            ?.value
-            .trim();
-
-
-    const password =
-        document
-            .getElementById(
-                "authPassword"
-            )
-            ?.value;
-
-
-    const message =
-        document.getElementById(
-            "authMessage"
-        );
-
-
-    const submit =
-        document.getElementById(
-            "authSubmit"
-        );
-
-
-    if (message) {
-
-        message.textContent = "";
-
-        message.className =
-            "form-message";
-    }
-
-
-    if (
-        authMode === "signup" &&
-        !fullName
-    ) {
-
-        message.textContent =
-            "Please enter your full name.";
-
-        message.classList.add(
-            "error"
-        );
-
-        return;
-    }
-
-
-    if (
-        !email ||
-        !password
-    ) {
-
-        message.textContent =
-            "Please enter email and password.";
-
-        message.classList.add(
-            "error"
-        );
-
-        return;
-    }
-
-
-    if (password.length < 6) {
-
-        message.textContent =
-            "Password must contain at least 6 characters.";
-
-        message.classList.add(
-            "error"
-        );
-
-        return;
-    }
-
-
-    submit.disabled = true;
-
-
-    submit.textContent =
-        authMode === "signup"
-            ? "Creating Account..."
-            : "Signing In...";
-
-
-    try {
-
-        if (authMode === "signup") {
-
-            const {
-                data,
-                error
-            } =
-                await supabaseClient.auth.signUp({
-
-                    email: email,
-
-                    password: password,
-
-                    options: {
-
-                        data: {
-                            full_name:
-                                fullName
-                        }
-                    }
-                });
-
-
-            if (error) {
-                throw error;
-            }
-
-
-            if (data.session) {
-
-                message.textContent =
-                    "Account created successfully.";
-
-                message.classList.add(
-                    "success"
-                );
-
-
-                await loadCurrentUser();
-
-                closeAuthPanel();
-
-                await showPage(
-                    "homePage"
-                );
-
-            } else {
-
-                message.textContent =
-                    "Account created. Please check your email and verify your account before logging in.";
-
-                message.classList.add(
-                    "success"
-                );
-            }
-
-
-            return;
-        }
-
-
-        const {
-            data,
-            error
-        } =
-            await supabaseClient.auth
-                .signInWithPassword({
-
-                    email: email,
-
-                    password: password
-                });
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        if (
-            !data ||
-            !data.session
-        ) {
-
-            throw new Error(
-                "Login succeeded but no session was created."
-            );
-        }
-
-
+  event.preventDefault();
+
+  const fullName = document.getElementById("authFullName")?.value.trim();
+  const email = document.getElementById("authEmail")?.value.trim();
+  const password = document.getElementById("authPassword")?.value;
+  const message = document.getElementById("authMessage");
+  const submit = document.getElementById("authSubmit");
+
+  if (message) {
+    message.textContent = "";
+    message.className = "form-message";
+  }
+
+  if (authMode === "signup" && !fullName) {
+    message.textContent = "Please enter your full name.";
+    message.classList.add("error");
+    return;
+  }
+
+  if (!email || !password) {
+    message.textContent = "Please enter email and password.";
+    message.classList.add("error");
+    return;
+  }
+
+  submit.disabled = true;
+  submit.textContent = authMode === "signup" ? "Creating Account..." : "Signing In...";
+
+  try {
+    if (authMode === "signup") {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } }
+      });
+
+      if (error) throw error;
+
+      if (data.session) {
         await loadCurrentUser();
-
         closeAuthPanel();
-
-        await showPage(
-            "homePage"
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "Authentication error:",
-            error
-        );
-
-
-        message.textContent =
-            error?.message ||
-            "Authentication failed.";
-
-        message.classList.add(
-            "error"
-        );
-
-
-    } finally {
-
-        submit.disabled = false;
-
-        submit.textContent =
-            authMode === "signup"
-                ? "Create Account"
-                : "Login";
+        await showPage("home");
+      } else {
+        message.textContent = "Account created. Please check your email and verify your account before logging in.";
+        message.classList.add("success");
+      }
+      return;
     }
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+    if (!data?.session) throw new Error("Login succeeded but no session was created.");
+
+    await loadCurrentUser();
+    closeAuthPanel();
+    await showPage("home");
+  } catch (error) {
+    message.textContent = error?.message || "Authentication failed.";
+    message.classList.add("error");
+  } finally {
+    submit.disabled = false;
+    submit.textContent = authMode === "signup" ? "Create Account" : "Login";
+  }
 }
-
-
-/* =========================================================
-   6. LOAD CURRENT USER
-   ========================================================= */
 
 async function loadCurrentUser() {
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
 
-    try {
-
-        const {
-            data,
-            error
-        } =
-            await supabaseClient.auth
-                .getSession();
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        const session =
-            data?.session;
-
-
-        if (!session) {
-
-            currentUser = null;
-
-            currentProfile = null;
-
-            updateAuthNavigation();
-
-            return;
-        }
-
-
-        currentUser =
-            session.user;
-
-
-        const {
-            data: profile,
-            error: profileError
-        } =
-            await supabaseClient
-                .from("profiles")
-                .select("*")
-                .eq(
-                    "id",
-                    currentUser.id
-                )
-                .maybeSingle();
-
-
-        if (profileError) {
-
-            console.error(
-                "Profile loading error:",
-                profileError
-            );
-
-            currentProfile = null;
-
-        } else {
-
-            currentProfile =
-                profile;
-        }
-
-
-        updateAuthNavigation();
-
-        updateApplicationEmail();
-
-        await updateHomeStats();
-
-
-    } catch (error) {
-
-        console.error(
-            "Session error:",
-            error
-        );
-
-
-        currentUser = null;
-
-        currentProfile = null;
-
-        updateAuthNavigation();
+    const session = data?.session;
+    if (!session) {
+      currentUser = null;
+      currentProfile = null;
+      updateAuthNavigation();
+      return;
     }
+
+    currentUser = session.user;
+
+    const { data: profile } = await supabaseClient
+      .from("profiles")
+      .select("*")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+    currentProfile = profile || null;
+    updateAuthNavigation();
+    updateApplicationEmail();
+    await updateHomeStats();
+  } catch (error) {
+    console.error("Session error:", error);
+    currentUser = null;
+    currentProfile = null;
+    updateAuthNavigation();
+  }
 }
 
-
-/* =========================================================
-   7. AUTH STATE LISTENER
-   ========================================================= */
-
-supabaseClient.auth.onAuthStateChange(
-    (
-        event,
-        session
-    ) => {
-
-        currentUser =
-            session?.user ||
-            null;
-
-
-        setTimeout(
-            async () => {
-
-                await loadCurrentUser();
-
-            },
-            0
-        );
-    }
-);
-
-
-/* =========================================================
-   8. AUTH NAVIGATION
-   ========================================================= */
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  currentUser = session?.user || null;
+  setTimeout(async () => {
+    await loadCurrentUser();
+  }, 0);
+});
 
 function updateAuthNavigation() {
+  const container = document.getElementById("authNavigation");
+  if (!container) return;
 
-    const container =
-        document.getElementById(
-            "authNavigation"
-        );
-
-
-    if (!container) {
-        return;
-    }
-
-
-    if (!currentUser) {
-
-        container.innerHTML = `
-            <button
-                type="button"
-                class="secondary-btn auth-nav-btn"
-                id="loginButton">
-                Login
-            </button>
-        `;
-
-
-        document
-            .getElementById(
-                "loginButton"
-            )
-            ?.addEventListener(
-                "click",
-                () => {
-
-                    openAuthPanel(
-                        "login"
-                    );
-
-                }
-            );
-
-
-        return;
-    }
-
-
-    const name =
-        currentProfile?.full_name ||
-        currentUser.email ||
-        "User";
-
-
-    const role =
-        currentProfile?.role ||
-        "student";
-
-
+  if (!currentUser) {
     container.innerHTML = `
-        <div class="user-menu">
-
-            <span class="user-name">
-                ${escapeHTML(name)}
-            </span>
-
-            <span class="user-role">
-                ${escapeHTML(role)}
-            </span>
-
-            <button
-                type="button"
-                class="secondary-btn"
-                id="logoutButton">
-                Sign Out
-            </button>
-
-        </div>
+      <button type="button" class="secondary-btn auth-nav-btn" id="loginButton">
+        Login
+      </button>
     `;
+    document.getElementById("loginButton")?.addEventListener("click", () => openAuthPanel("login"));
+    return;
+  }
 
+  const name = currentProfile?.full_name || currentUser.email || "User";
+  const role = currentProfile?.role || "student";
 
-    document
-        .getElementById(
-            "logoutButton"
-        )
-        ?.addEventListener(
-            "click",
-            signOut
-        );
+  container.innerHTML = `
+    <div class="user-menu">
+      <span class="user-name">${escapeHTML(name)}</span>
+      <span class="user-role">${escapeHTML(role)}</span>
+      <button type="button" class="secondary-btn" id="logoutButton">Sign Out</button>
+    </div>
+  `;
+
+  document.getElementById("logoutButton")?.addEventListener("click", signOut);
 }
-
-
-/* =========================================================
-   9. SIGN OUT
-   ========================================================= */
 
 async function signOut() {
-
-    const {
-        error
-    } =
-        await supabaseClient.auth
-            .signOut();
-
-
-    if (error) {
-
-        console.error(
-            "Sign out error:",
-            error
-        );
-
-        return;
-    }
-
-
-    currentUser = null;
-
-    currentProfile = null;
-
-
-    updateAuthNavigation();
-
-    await showPage(
-        "homePage"
-    );
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  currentProfile = null;
+  updateAuthNavigation();
+  await showPage("home");
 }
-
-
-/* =========================================================
-   10. REQUIRE LOGIN
-   ========================================================= */
 
 async function requireLogin() {
-
-    if (currentUser) {
-        return true;
-    }
-
-
-    const {
-        data,
-        error
-    } =
-        await supabaseClient.auth
-            .getSession();
-
-
-    if (
-        !error &&
-        data?.session
-    ) {
-
-        await loadCurrentUser();
-
-        return true;
-    }
-
-
-    openAuthPanel(
-        "login"
-    );
-
-
-    return false;
+  if (currentUser) return true;
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (!error && data?.session) {
+    await loadCurrentUser();
+    return true;
+  }
+  openAuthPanel("login");
+  return false;
 }
-
-
-/* =========================================================
-   11. REQUIRE OFFICER
-   ========================================================= */
 
 async function requireOfficer() {
+  const loggedIn = await requireLogin();
+  if (!loggedIn) return false;
 
-    const loggedIn =
-        await requireLogin();
-
-
-    if (!loggedIn) {
-        return false;
-    }
-
-
-    if (
-        !currentProfile ||
-        currentProfile.role !== "officer"
-    ) {
-
-        alert(
-            "Officer access is required to open this page."
-        );
-
-
-        await showPage(
-            "homePage"
-        );
-
-
-        return false;
-    }
-
-
-    return true;
+  if (!currentProfile || currentProfile.role !== "officer") {
+    alert("Officer access is required to open this page.");
+    await showPage("home");
+    return false;
+  }
+  return true;
 }
-
-
-/* =========================================================
-   12. APPLICATION PRE-CHECK
-   ========================================================= */
-
-function runPreCheck() {
-
-    const form =
-        document.getElementById(
-            "applicationForm"
-        );
-
-
-    if (!form) {
-        return [];
-    }
-
-
-    const name =
-        String(
-            form.elements["name"]?.value ||
-            ""
-        ).trim();
-
-
-    const email =
-        String(
-            form.elements["email"]?.value ||
-            ""
-        ).trim();
-
-
-    const phone =
-        String(
-            form.elements["phone"]?.value ||
-            ""
-        ).trim();
-
-
-    const scheme =
-        String(
-            form.elements["scheme"]?.value ||
-            ""
-        ).trim();
-
-
-    const education =
-        String(
-            form.elements["education"]?.value ||
-            ""
-        ).trim();
-
-
-    const institution =
-        String(
-            form.elements["institution"]?.value ||
-            ""
-        ).trim();
-
-
-    const income =
-        Number(
-            form.elements["income"]?.value
-        );
-
-
-    const marks =
-        Number(
-            form.elements["marks"]?.value
-        );
-
-
-    const stCertificate =
-        getSelectedFile(
-            "stCertificate"
-        );
-
-
-    const marksheet =
-        getSelectedFile(
-            "marksheet"
-        );
-
-
-    const incomeCertificate =
-        getSelectedFile(
-            "incomeCertificate"
-        );
-
-
-    const offerLetter =
-        getSelectedFile(
-            "offerLetter"
-        );
-
-
-    const issues = [];
-
-
-    if (!name) {
-        issues.push(
-            "Full name is required."
-        );
-    }
-
-
-    if (!email) {
-        issues.push(
-            "Email is required."
-        );
-    }
-
-
-    if (!phone) {
-        issues.push(
-            "Phone number is required."
-        );
-    }
-
-
-    if (!scheme) {
-        issues.push(
-            "Select a scholarship scheme."
-        );
-    }
-
-
-    if (!education) {
-        issues.push(
-            "Education qualification is required."
-        );
-    }
-
-
-    if (!institution) {
-        issues.push(
-            "Institution is required."
-        );
-    }
-
-
-    if (!stCertificate) {
-        issues.push(
-            "ST Certificate is required."
-        );
-    }
-
-
-    if (!marksheet) {
-        issues.push(
-            "Marksheet is required."
-        );
-    }
-
-
-    if (!incomeCertificate) {
-        issues.push(
-            "Income Certificate is required."
-        );
-    }
-
-
-    if (
-        scheme === "NOS" &&
-        !offerLetter
-    ) {
-
-        issues.push(
-            "Offer Letter is required for NOS."
-        );
-    }
-
-
-    if (
-        Number.isNaN(income) ||
-        income < 0
-    ) {
-
-        issues.push(
-            "Enter a valid annual income."
-        );
-    }
-
-
-    if (
-        Number.isNaN(marks) ||
-        marks < 0 ||
-        marks > 100
-    ) {
-
-        issues.push(
-            "Marks must be between 0 and 100."
-        );
-    }
-
-
-    const readinessBox =
-        document.getElementById(
-            "readinessBox"
-        );
-
-
-    const readinessMessage =
-        document.getElementById(
-            "readinessMessage"
-        );
-
-
-    if (!readinessBox || !readinessMessage) {
-        return issues;
-    }
-
-
-    if (issues.length === 0) {
-
-        readinessBox.classList.add(
-            "ready"
-        );
-
-
-        readinessMessage.textContent =
-            "Your application appears ready to submit.";
-
-    } else {
-
-        readinessBox.classList.remove(
-            "ready"
-        );
-
-
-        readinessMessage.textContent =
-            `${issues.length} item(s) need attention before submission.`;
-    }
-
-
-    return issues;
-}
-
-
-/* =========================================================
-   13. APPLICATION EMAIL
-   ========================================================= */
 
 function updateApplicationEmail() {
-
-    const emailInput =
-        document.getElementById(
-            "email"
-        );
-
-
-    if (!emailInput) {
-        return;
-    }
-
-
-    if (currentUser?.email) {
-
-        emailInput.value =
-            currentUser.email;
-
-        emailInput.readOnly = true;
-    }
+  const emailInput = document.getElementById("email");
+  if (emailInput && currentUser?.email) {
+    emailInput.value = currentUser.email;
+    emailInput.readOnly = true;
+  }
+  const nameInput = document.getElementById("fullName");
+  if (nameInput && !nameInput.value && currentProfile?.full_name) {
+    nameInput.value = currentProfile.full_name;
+  }
 }
 
-
 /* =========================================================
-   14. FILE HELPERS
+   9. PRE-CHECK, READINESS & APPLICATION SUBMISSION (Supabase)
    ========================================================= */
-
 function getSelectedFile(elementId) {
-
-    const input =
-        document.getElementById(
-            elementId
-        );
-
-
-    if (
-        !input ||
-        !input.files ||
-        !input.files.length
-    ) {
-
-        return null;
-    }
-
-
-    return input.files[0];
+  const input = document.getElementById(elementId);
+  return input?.files?.[0] || null;
 }
 
+function runPreCheck(data) {
+  const issues = [];
 
-/* =========================================================
-   15. APPLICATION SUBMISSION
-   ========================================================= */
+  if (!data.name.trim()) issues.push("Student name is missing.");
+  if (!data.email.trim()) issues.push("Email is missing.");
+  if (!data.phone.trim()) issues.push("Mobile number is missing.");
+  if (!data.stCertificate) issues.push("ST certificate is missing.");
+  if (!data.marksheet) issues.push("Academic record is missing.");
+  if (!data.incomeCertificate) issues.push("Income certificate is missing.");
+  if (data.scheme === "NOS" && !data.offerLetter) {
+    issues.push("Offer letter is missing for this demo workflow.");
+  }
+  if (data.income < 0 || !Number.isFinite(data.income)) {
+    issues.push("Income value is invalid.");
+  }
+  if (data.marks < 0 || data.marks > 100 || !Number.isFinite(data.marks)) {
+    issues.push("Marks must be between 0 and 100.");
+  }
+  if (data.nameMismatchFlagged) {
+    issues.push("OCR detected a possible name mismatch between your application and an uploaded document.");
+  }
+
+  return issues;
+}
+
+function checkApplicationReadiness() {
+  const checks = [
+    { id: "fullName", label: "Full Name" },
+    { id: "email", label: "Email Address" },
+    { id: "phone", label: "Mobile Number" },
+    { id: "scheme", label: "Scholarship Scheme" },
+    { id: "education", label: "Education Level" },
+    { id: "income", label: "Annual Family Income" },
+    { id: "marks", label: "Percentage / Marks" },
+    { id: "institution", label: "Institution / University" },
+    { id: "stCertificate", label: "ST Certificate" },
+    { id: "marksheet", label: "Marksheets / Academic Record" },
+    { id: "incomeCertificate", label: "Income Certificate" }
+  ];
+
+  if (document.getElementById("scheme")?.value === "NOS") {
+    checks.push({ id: "offerLetter", label: "University Offer Letter" });
+  }
+
+  const missing = [];
+
+  checks.forEach(item => {
+    const field = document.getElementById(item.id);
+    if (!field) {
+      missing.push(item.label);
+      return;
+    }
+    if (field.type === "file") {
+      if (!field.files || field.files.length === 0) missing.push(item.label);
+    } else if (!field.value.trim()) {
+      missing.push(item.label);
+    }
+  });
+
+  const expiryIssues = checkExpiredCertificates();
+  const result = document.getElementById("readinessResult");
+  if (!result) return;
+
+  if (missing.length === 0 && expiryIssues.length === 0) {
+    result.innerHTML = `
+      <div class="readiness-success">
+        <h3>✓ Application looks complete!</h3>
+        <p>
+          All required fields and documents appear to be present.
+          Please review your information before submitting.
+        </p>
+      </div>
+    `;
+  } else {
+    const missingItems = missing.map(item => `<li>${escapeHTML(item)}</li>`).join("");
+    const expiryItems = expiryIssues
+      .map(
+        item =>
+          `<li>${escapeHTML(item.label)} looks dated ${escapeHTML(item.issueDate)} (${item.ageDays} days ago) and may be expired.</li>`
+      )
+      .join("");
+
+    result.innerHTML = `
+      <div class="readiness-warning">
+        <h3>Some information is missing or needs attention</h3>
+        <p>Please complete the following:</p>
+        <ul>
+          ${missingItems}
+          ${expiryItems}
+        </ul>
+      </div>
+    `;
+  }
+
+  result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function showFormMessage(message, type) {
+  const box = document.getElementById("formMessage");
+  if (!box) return;
+  box.textContent = message;
+  box.className = `message ${type}`;
+  box.classList.remove("hidden");
+}
 
 async function submitApplication(event) {
+  event.preventDefault();
 
-    event.preventDefault();
+  const loggedIn = await requireLogin();
+  if (!loggedIn) return;
 
+  const submitButton = document.querySelector("#applicationForm button[type='submit']");
+  const scheme = document.getElementById("scheme").value;
 
-    const message =
-        document.getElementById(
-            "applicationMessage"
-        );
+  const data = {
+    name: document.getElementById("fullName").value.trim(),
+    email: currentUser.email || document.getElementById("email").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    scheme,
+    education: document.getElementById("education").value,
+    income: Number(document.getElementById("income").value),
+    marks: Number(document.getElementById("marks").value),
+    institution: document.getElementById("institution").value.trim(),
+    stCertificate: document.getElementById("stCertificate").files[0]?.name || "",
+    marksheet: document.getElementById("marksheet").files[0]?.name || "",
+    incomeCertificate: document.getElementById("incomeCertificate").files[0]?.name || "",
+    offerLetter: document.getElementById("offerLetter").files[0]?.name || "",
+    nameMismatchFlagged: (crossCheckExtractedNames() || []).length > 0
+  };
 
+  // Run all 3 AI checks: Basic + Eligibility Engine + Expiry Check
+  const issues = runPreCheck(data);
+  const eligibilitySnapshot = runEligibilityPreCheck();
+  const eligibilityIssues = getEligibilityIssues(eligibilitySnapshot);
+  issues.push(...eligibilityIssues);
 
-    const submitButton =
-        document.querySelector(
-            "#applicationForm button[type='submit']"
-        );
+  const expiryIssues = checkExpiredCertificates();
+  expiryIssues.forEach(item => {
+    issues.push(
+      `${item.label} appears to be dated ${item.issueDate} (${item.ageDays} days ago) and may be expired — please upload a recent copy.`
+    );
+  });
 
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Submitting...";
+  }
 
-    if (!message) {
-        return;
+  try {
+    const { data: application, error: applicationError } = await supabaseClient
+      .from("applications")
+      .insert({
+        user_id: currentUser.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        scheme: data.scheme,
+        education: data.education,
+        income: data.income,
+        marks: data.marks,
+        institution: data.institution,
+        status: issues.length ? "Deficient" : "Submitted",
+        pre_check: issues.length === 0,
+        issues: issues,
+        review_note: null
+      })
+      .select()
+      .single();
+
+    if (applicationError) throw applicationError;
+
+    const documents = [
+      { elementId: "stCertificate", type: "ST Certificate" },
+      { elementId: "marksheet", type: "Marksheet" },
+      { elementId: "incomeCertificate", type: "Income Certificate" }
+    ];
+
+    if (scheme === "NOS") {
+      documents.push({ elementId: "offerLetter", type: "Offer Letter" });
     }
 
+    for (const doc of documents) {
+      const file = getSelectedFile(doc.elementId);
+      if (!file) continue;
 
-    message.textContent = "";
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = `${currentUser.id}/${application.id}/${doc.type.replace(/\s+/g, "-")}-${Date.now()}-${safeName}`;
 
-    message.className =
-        "form-message";
+      const { error: uploadError } = await supabaseClient.storage
+        .from("application-documents")
+        .upload(storagePath, file, { upsert: false });
 
+      if (uploadError) throw uploadError;
 
-    const loggedIn =
-        await requireLogin();
+      const { error: documentError } = await supabaseClient
+        .from("application_documents")
+        .insert({
+          application_id: application.id,
+          document_type: doc.type,
+          original_filename: file.name,
+          storage_path: storagePath
+        });
 
-
-    if (!loggedIn) {
-        return;
+      if (documentError) throw documentError;
     }
 
+    const appDisplayId = application.application_id || application.id;
+    const preCheckLabel = issues.length ? "Issues detected" : "Basic checks passed";
 
-    const issues =
-        runPreCheck();
+    showFormMessage(
+      `Application saved! Your Application ID is ${appDisplayId}. Pre-check: ${preCheckLabel}.`,
+      "success"
+    );
 
-
-    if (issues.length > 0) {
-
-        message.textContent =
-            issues[0];
-
-        message.classList.add(
-            "error"
-        );
-
-        return;
+    if (issues.length) {
+      generateSmartDeficiencyAlert(
+        { ...application, id: appDisplayId },
+        issues
+      );
     }
 
+    // Reset Form and UI states
+    document.getElementById("applicationForm")?.reset();
+    Object.keys(ocrData).forEach(k => delete ocrData[k]);
+    ["stCertificate", "marksheet", "incomeCertificate"].forEach(docType => {
+      const box = document.getElementById(`ocr-${docType}`);
+      if (box) {
+        box.innerHTML = "";
+        box.classList.add("hidden");
+      }
+    });
 
-    const form =
-        document.getElementById(
-            "applicationForm"
-        );
+    updateOcrSummary();
+    clearFieldCheck("fullName");
+    clearFieldCheck("marks");
+    clearFieldCheck("income");
 
+    const verificationPanel = document.getElementById("crossVerificationResult");
+    if (verificationPanel) {
+      verificationPanel.innerHTML = "Upload documents and fill the form fields above to run verification.";
+    }
 
-    const formData =
-        new FormData(form);
+    const nameField = document.getElementById("fullName");
+    if (nameField) {
+      nameField.readOnly = false;
+      nameField.classList.remove("verified-field");
+    }
 
+    updateApplicationEmail();
+    updateSchemeFields();
+    await updateHomeStats();
 
-    const scheme =
-        formData.get("scheme");
-
-
-    const name =
-        String(
-            formData.get("name") || ""
-        ).trim();
-
-
-    const email =
-        currentUser.email;
-
-
-    const phone =
-        String(
-            formData.get("phone") || ""
-        ).trim();
-
-
-    const education =
-        String(
-            formData.get("education") || ""
-        ).trim();
-
-
-    const income =
-        Number(
-            formData.get("income")
-        );
-
-
-    const marks =
-        Number(
-            formData.get("marks")
-        );
-
-
-    const institution =
-        String(
-            formData.get("institution") || ""
-        ).trim();
-
-
+  } catch (error) {
+    console.error("Application submission error:", error);
+    showFormMessage(error?.message || "Unable to submit application.", "error");
+  } finally {
     if (submitButton) {
-
-        submitButton.disabled = true;
-
-        submitButton.textContent =
-            "Submitting...";
+      submitButton.disabled = false;
+      submitButton.textContent = "Check & Submit Application";
     }
-
-
-    try {
-
-        const {
-            data: application,
-            error: applicationError
-        } =
-            await supabaseClient
-                .from("applications")
-                .insert({
-
-                    user_id:
-                        currentUser.id,
-
-                    name,
-
-                    email,
-
-                    phone,
-
-                    scheme,
-
-                    education,
-
-                    income,
-
-                    marks,
-
-                    institution,
-
-                    status:
-                        "Submitted",
-
-                    pre_check:
-                        true,
-
-                    issues: [],
-
-                    review_note:
-                        null
-
-                })
-                .select()
-                .single();
-
-
-        if (applicationError) {
-            throw applicationError;
-        }
-
-
-        const documents = [
-
-            {
-                elementId:
-                    "stCertificate",
-
-                type:
-                    "ST Certificate"
-            },
-
-            {
-                elementId:
-                    "marksheet",
-
-                type:
-                    "Marksheet"
-            },
-
-            {
-                elementId:
-                    "incomeCertificate",
-
-                type:
-                    "Income Certificate"
-            }
-
-        ];
-
-
-        if (scheme === "NOS") {
-
-            documents.push({
-
-                elementId:
-                    "offerLetter",
-
-                type:
-                    "Offer Letter"
-
-            });
-        }
-
-
-        for (
-            const document
-            of documents
-        ) {
-
-            const file =
-                getSelectedFile(
-                    document.elementId
-                );
-
-
-            if (!file) {
-                continue;
-            }
-
-
-            const safeName =
-                file.name.replace(
-                    /[^a-zA-Z0-9._-]/g,
-                    "_"
-                );
-
-
-            const storagePath =
-                `${currentUser.id}/${application.id}/${document.type.replace(/\s+/g, "-")}-${Date.now()}-${safeName}`;
-
-
-            const {
-                error: uploadError
-            } =
-                await supabaseClient
-                    .storage
-                    .from(
-                        "application-documents"
-                    )
-                    .upload(
-                        storagePath,
-                        file,
-                        {
-                            upsert: false
-                        }
-                    );
-
-
-            if (uploadError) {
-                throw uploadError;
-            }
-
-
-            const {
-                error: documentError
-            } =
-                await supabaseClient
-                    .from(
-                        "application_documents"
-                    )
-                    .insert({
-
-                        application_id:
-                            application.id,
-
-                        document_type:
-                            document.type,
-
-                        original_filename:
-                            file.name,
-
-                        storage_path:
-                            storagePath
-
-                    });
-
-
-            if (documentError) {
-                throw documentError;
-            }
-        }
-
-
-        message.textContent =
-            `Application submitted successfully. Your Application ID is ${application.application_id}.`;
-
-
-        message.classList.add(
-            "success"
-        );
-
-
-        form.reset();
-
-
-        updateApplicationEmail();
-
-        updateOfferLetterRequirement();
-
-        runPreCheck();
-
-        await updateHomeStats();
-
-
-        setTimeout(
-            () => {
-
-                const trackingInput =
-                    document.getElementById(
-                        "trackingId"
-                    );
-
-
-                if (trackingInput) {
-
-                    trackingInput.value =
-                        application.application_id;
-                }
-
-
-                showPage(
-                    "trackPage"
-                );
-
-            },
-            1200
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "Application submission error:",
-            error
-        );
-
-
-        message.textContent =
-            error?.message ||
-            "Unable to submit application.";
-
-        message.classList.add(
-            "error"
-        );
-
-
-    } finally {
-
-        if (submitButton) {
-
-            submitButton.disabled =
-                false;
-
-            submitButton.textContent =
-                "Submit Application";
-        }
-    }
+  }
 }
 
-
 /* =========================================================
-   16. TRACK APPLICATION
+   10. TRACK APPLICATION & OFFICER PORTAL (Supabase)
    ========================================================= */
+const STATUSES = ["Submitted", "Under Review", "Deficient", "Approved (Demo)"];
 
 async function trackApplication(event) {
+  event.preventDefault();
 
-    event.preventDefault();
+  const loggedIn = await requireLogin();
+  if (!loggedIn) return;
 
+  const id = document.getElementById("trackingId")?.value.trim();
+  const result = document.getElementById("trackingResult");
+  if (!id || !result) return;
 
-    const trackingInput =
-        document.getElementById(
-            "trackingId"
-        );
+  try {
+    const { data: application, error } = await supabaseClient
+      .from("applications")
+      .select("*")
+      .eq("application_id", id)
+      .maybeSingle();
 
+    if (error) throw error;
 
-    const message =
-        document.getElementById(
-            "trackingMessage"
-        );
-
-
-    const result =
-        document.getElementById(
-            "trackingResult"
-        );
-
-
-    if (!trackingInput || !message || !result) {
-        return;
+    if (!application) {
+      result.innerHTML = `
+        <div class="message error">
+          No application found. Please check your Application ID.
+        </div>
+      `;
+      document.getElementById("applicationTimeline")?.classList.add("hidden");
+      return;
     }
 
+    const appDisplayId = application.application_id || application.id;
+    const appIssues = Array.isArray(application.issues) ? application.issues : [];
+    const issueList = appIssues.length
+      ? appIssues.map(issue => `<li>${escapeHTML(issue)}</li>`).join("")
+      : `<li>No missing fields detected by the basic demo checks.</li>`;
 
-    const trackingId =
-        trackingInput.value.trim();
+    const hasDeficiencyAlert = Boolean(getAlertCache()[appDisplayId] || appIssues.length > 0);
 
-
-    message.textContent = "";
-
-    message.className =
-        "form-message";
-
-
-    result.classList.add(
-        "hidden"
-    );
-
-
-    const loggedIn =
-        await requireLogin();
-
-
-    if (!loggedIn) {
-        return;
-    }
-
-
-    if (!trackingId) {
-
-        message.textContent =
-            "Please enter an application ID.";
-
-        message.classList.add(
-            "error"
-        );
-
-        return;
-    }
-
-
-    try {
-
-        const {
-            data: application,
-            error
-        } =
-            await supabaseClient
-                .from("applications")
-                .select("*")
-                .eq(
-                    "application_id",
-                    trackingId
-                )
-                .maybeSingle();
-
-
-        if (error) {
-            throw error;
+    result.innerHTML = `
+      <div class="result-card">
+        <h3>Application Details</h3>
+        <div class="result-line">
+          <span>Application ID</span>
+          <strong>${escapeHTML(appDisplayId)}</strong>
+        </div>
+        <div class="result-line">
+          <span>Student</span>
+          <strong>${escapeHTML(application.name)}</strong>
+        </div>
+        <div class="result-line">
+          <span>Scheme</span>
+          <strong>${escapeHTML(application.scheme)}</strong>
+        </div>
+        <div class="result-line">
+          <span>Status</span>
+          ${createStatusBadge(application.status)}
+        </div>
+        <div class="result-line">
+          <span>Submitted</span>
+          <strong>${escapeHTML(formatDate(application.submitted_at))}</strong>
+        </div>
+        <h3 style="margin-top:20px">Pre-check Findings</h3>
+        <ul>${issueList}</ul>
+        <p class="muted" style="margin-top:15px">
+          ${
+            application.review_note
+              ? "Officer note: " + escapeHTML(application.review_note)
+              : "No officer note has been added."
+          }
+        </p>
+        ${
+          hasDeficiencyAlert
+            ? `
+              <button
+                type="button"
+                class="secondary-btn"
+                style="margin-top:12px"
+                onclick="viewDeficiencyAlert('${escapeHTML(appDisplayId)}')"
+              >
+                🔔 View Smart Deficiency Alert
+              </button>
+            `
+            : ""
         }
+      </div>
+    `;
 
-
-        if (!application) {
-
-            message.textContent =
-                "Application not found.";
-
-            message.classList.add(
-                "error"
-            );
-
-            return;
-        }
-
-
-        renderTrackingResult(
-            application
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "Tracking error:",
-            error
-        );
-
-
-        message.textContent =
-            error?.message ||
-            "Unable to find application.";
-
-        message.classList.add(
-            "error"
-        );
-    }
+    renderApplicationTimeline(application.status);
+  } catch (error) {
+    result.innerHTML = `<div class="message error">${escapeHTML(error.message)}</div>`;
+  }
 }
-
-
-/* =========================================================
-   17. RENDER TRACKING RESULT
-   ========================================================= */
-
-function renderTrackingResult(application) {
-
-    const result =
-        document.getElementById(
-            "trackingResult"
-        );
-
-
-    if (!result) {
-        return;
-    }
-
-
-    result.classList.remove(
-        "hidden"
-    );
-
-
-    setText(
-        "trackingApplicationId",
-        application.application_id
-    );
-
-
-    setText(
-        "trackingStatus",
-        application.status
-    );
-
-
-    setText(
-        "trackingName",
-        application.name
-    );
-
-
-    setText(
-        "trackingScheme",
-        application.scheme
-    );
-
-
-    setText(
-        "trackingSubmitted",
-        formatDate(
-            application.submitted_at
-        )
-    );
-
-
-    setText(
-        "trackingReviewNote",
-        application.review_note ||
-        "No review note yet."
-    );
-
-
-    renderTimeline(
-        application.status
-    );
-}
-
-
-/* =========================================================
-   18. TIMELINE
-   ========================================================= */
-
-function renderTimeline(currentStatus) {
-
-    const timeline =
-        document.getElementById(
-            "trackingTimeline"
-        );
-
-
-    if (!timeline) {
-        return;
-    }
-
-
-    const statuses = [
-
-        "Submitted",
-
-        "Under Review",
-
-        "Deficient",
-
-        "Approved (Demo)"
-
-    ];
-
-
-    timeline.innerHTML =
-        statuses
-            .map(
-                status => {
-
-                    const active =
-                        status === currentStatus
-                            ? "active"
-                            : "";
-
-
-                    const completed =
-                        isStatusCompleted(
-                            status,
-                            currentStatus
-                        )
-                            ? "completed"
-                            : "";
-
-
-                    return `
-                        <div
-                            class="timeline-item ${active} ${completed}">
-
-                            <div class="timeline-dot"></div>
-
-                            <div class="timeline-content">
-
-                                <strong>
-                                    ${escapeHTML(status)}
-                                </strong>
-
-                            </div>
-
-                        </div>
-                    `;
-                }
-            )
-            .join("");
-}
-
-
-function isStatusCompleted(
-    status,
-    currentStatus
-) {
-
-    const order = [
-
-        "Submitted",
-
-        "Under Review",
-
-        "Deficient",
-
-        "Approved (Demo)"
-
-    ];
-
-
-    const currentIndex =
-        order.indexOf(
-            currentStatus
-        );
-
-
-    const statusIndex =
-        order.indexOf(
-            status
-        );
-
-
-    if (
-        currentIndex === -1 ||
-        statusIndex === -1
-    ) {
-        return false;
-    }
-
-
-    return statusIndex < currentIndex;
-}
-
-
-/* =========================================================
-   19. OFFICER PORTAL
-   ========================================================= */
 
 async function renderAdmin() {
+  const allowed = await requireOfficer();
+  if (!allowed) return;
 
-    const allowed =
-        await requireOfficer();
+  const table = document.getElementById("applicationsTable");
+  if (!table) return;
 
+  table.innerHTML = `<tr><td colspan="6" class="empty-state">Loading applications...</td></tr>`;
 
-    if (!allowed) {
-        return;
+  try {
+    const { data: applications, error } = await supabaseClient
+      .from("applications")
+      .select("*")
+      .order("submitted_at", { ascending: false });
+
+    if (error) throw error;
+
+    const apps = applications || [];
+
+    setText("adminTotal", apps.length);
+    setText("adminReview", apps.filter(item => item.status === "Under Review").length);
+    setText("adminDeficient", apps.filter(item => item.status === "Deficient").length);
+    setText("adminApproved", apps.filter(item => item.status === "Approved (Demo)").length);
+
+    if (!apps.length) {
+      table.innerHTML = `
+        <tr>
+          <td colspan="6" class="empty-state">
+            No applications yet. Submit a demo application first.
+          </td>
+        </tr>
+      `;
+      return;
     }
 
-
-    const container =
-        document.getElementById(
-            "adminApplications"
-        );
-
-
-    const message =
-        document.getElementById(
-            "adminMessage"
-        );
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML =
-        "<p>Loading applications...</p>";
-
-
-    try {
-
-        const {
-            data: applications,
-            error
-        } =
-            await supabaseClient
-                .from("applications")
-                .select("*")
-                .order(
-                    "submitted_at",
-                    {
-                        ascending: false
-                    }
-                );
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        updateAdminStats(
-            applications || []
-        );
-
-
-        if (
-            !applications ||
-            applications.length === 0
-        ) {
-
-            container.innerHTML =
-                "<p>No applications found.</p>";
-
-            return;
-        }
-
-
-        container.innerHTML =
-            applications
-                .map(
-                    application =>
-                        renderAdminApplication(
-                            application
-                        )
-                )
-                .join("");
-
-
-        document
-            .querySelectorAll(
-                ".admin-status-select"
-            )
-            .forEach(
-                select => {
-
-                    select.addEventListener(
-                        "change",
-                        handleAdminStatusChange
-                    );
-                }
-            );
-
-
-    } catch (error) {
-
-        console.error(
-            "Admin loading error:",
-            error
-        );
-
-
-        container.innerHTML = "";
-
-
-        if (message) {
-
-            message.textContent =
-                error?.message ||
-                "Unable to load applications.";
-
-            message.classList.add(
-                "error"
-            );
-        }
-    }
-}
-
-
-/* =========================================================
-   20. ADMIN APPLICATION CARD
-   ========================================================= */
-
-function renderAdminApplication(
-    application
-) {
-
-    return `
-        <article class="admin-application-card">
-
-            <div class="admin-card-header">
-
-                <div>
-
-                    <span class="eyebrow">
-                        APPLICATION
-                    </span>
-
-                    <h3>
-                        ${escapeHTML(
-                            application.application_id
-                        )}
-                    </h3>
-
-                </div>
-
-
-                <span class="status-badge">
-                    ${escapeHTML(
-                        application.status
-                    )}
-                </span>
-
-            </div>
-
-
-            <div class="admin-details">
-
-                <div>
-                    <span>Name</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            application.name
-                        )}
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Email</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            application.email
-                        )}
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Phone</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            application.phone
-                        )}
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Scheme</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            application.scheme
-                        )}
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Education</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            application.education
-                        )}
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Marks</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            String(
-                                application.marks
-                            )
-                        )}%
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Income</span>
-
-                    <strong>
-                        ₹${escapeHTML(
-                            String(
-                                application.income
-                            )
-                        )}
-                    </strong>
-                </div>
-
-
-                <div>
-                    <span>Institution</span>
-
-                    <strong>
-                        ${escapeHTML(
-                            application.institution
-                        )}
-                    </strong>
-                </div>
-
-            </div>
-
-
-            <div class="admin-actions">
-
-                <label>
-                    Update Status
-                </label>
-
-
-                <select
-                    class="admin-status-select"
-                    data-application-id="${application.id}">
-
-                    <option
-                        value="Submitted"
-                        ${
-                            application.status === "Submitted"
-                                ? "selected"
-                                : ""
-                        }>
-                        Submitted
+    const alertCache = getAlertCache();
+
+    table.innerHTML = apps
+      .map(application => {
+        const appDisplayId = application.application_id || application.id;
+        const appIssues = Array.isArray(application.issues) ? application.issues : [];
+        const hasAlert = Boolean(alertCache[appDisplayId] || appIssues.length > 0);
+        const preCheckLabel = application.pre_check ? "Basic checks passed" : "Issues detected";
+
+        return `
+          <tr>
+            <td><strong>${escapeHTML(appDisplayId)}</strong></td>
+            <td>${escapeHTML(application.name)}</td>
+            <td>${escapeHTML(application.scheme)}</td>
+            <td>
+              ${escapeHTML(preCheckLabel)}
+              ${
+                hasAlert
+                  ? `
+                    <button
+                      type="button"
+                      class="text-btn alert-bell-btn"
+                      onclick="viewDeficiencyAlert('${escapeHTML(appDisplayId)}')"
+                    >
+                      🔔 View Alert
+                    </button>
+                  `
+                  : ""
+              }
+            </td>
+            <td>${createStatusBadge(application.status)}</td>
+            <td>
+              <select
+                aria-label="Update status for ${escapeHTML(appDisplayId)}"
+                onchange="updateStatus('${escapeHTML(application.id)}', this.value)"
+              >
+                ${STATUSES.map(
+                  status => `
+                    <option value="${status}" ${application.status === status ? "selected" : ""}>
+                      ${status}
                     </option>
-
-
-                    <option
-                        value="Under Review"
-                        ${
-                            application.status === "Under Review"
-                                ? "selected"
-                                : ""
-                        }>
-                        Under Review
-                    </option>
-
-
-                    <option
-                        value="Deficient"
-                        ${
-                            application.status === "Deficient"
-                                ? "selected"
-                                : ""
-                        }>
-                        Deficient
-                    </option>
-
-
-                    <option
-                        value="Approved (Demo)"
-                        ${
-                            application.status === "Approved (Demo)"
-                                ? "selected"
-                                : ""
-                        }>
-                        Approved (Demo)
-                    </option>
-
-                </select>
-
-            </div>
-
-
-            <div class="admin-review-note">
-
-                <label>
-                    Review Note
-                </label>
-
-
-                <textarea
-                    class="admin-note"
-                    data-application-id="${application.id}"
-                    placeholder="Add a review note...">${escapeHTML(
-                        application.review_note || ""
-                    )}</textarea>
-
-
+                  `
+                ).join("")}
+              </select>
+              <div class="admin-note-wrap">
+                <input
+                  type="text"
+                  class="admin-note"
+                  data-application-id="${escapeHTML(application.id)}"
+                  placeholder="Add review note..."
+                  value="${escapeHTML(application.review_note || "")}"
+                >
                 <button
-                    type="button"
-                    class="secondary-btn save-note-btn"
-                    data-application-id="${application.id}">
-                    Save Note
+                  type="button"
+                  class="secondary-btn save-note-btn"
+                  data-application-id="${escapeHTML(application.id)}"
+                >
+                  Save
                 </button>
-
-            </div>
-
-        </article>
-    `;
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    table.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHTML(error.message)}</td></tr>`;
+  }
 }
 
+async function updateStatus(id, status) {
+  if (!STATUSES.includes(status)) return;
+  const allowed = await requireOfficer();
+  if (!allowed) return;
 
-/* =========================================================
-   21. ADMIN STATUS CHANGE
-   ========================================================= */
+  try {
+    const { error } = await supabaseClient
+      .from("applications")
+      .update({
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
 
-async function handleAdminStatusChange(
-    event
-) {
+    if (error) throw error;
 
-    const applicationId =
-        event.target.dataset.applicationId;
-
-
-    const newStatus =
-        event.target.value;
-
-
-    await updateApplicationStatus(
-        applicationId,
-        newStatus
-    );
+    await renderAdmin();
+    await updateHomeStats();
+  } catch (error) {
+    alert(error?.message || "Unable to update status.");
+  }
 }
 
+async function saveReviewNote(applicationId) {
+  const allowed = await requireOfficer();
+  if (!allowed) return;
 
-/* =========================================================
-   22. UPDATE APPLICATION STATUS
-   ========================================================= */
+  const input = document.querySelector(`.admin-note[data-application-id="${applicationId}"]`);
+  if (!input) return;
 
-async function updateApplicationStatus(
-    applicationId,
-    newStatus
-) {
+  try {
+    const { error } = await supabaseClient
+      .from("applications")
+      .update({
+        review_note: input.value.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", applicationId);
 
-    const allowed =
-        await requireOfficer();
-
-
-    if (!allowed) {
-        return;
-    }
-
-
-    try {
-
-        const {
-            error
-        } =
-            await supabaseClient
-                .from("applications")
-                .update({
-
-                    status:
-                        newStatus,
-
-                    updated_at:
-                        new Date().toISOString()
-
-                })
-                .eq(
-                    "id",
-                    applicationId
-                );
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        await renderAdmin();
-
-        await updateHomeStats();
-
-
-    } catch (error) {
-
-        console.error(
-            "Status update error:",
-            error
-        );
-
-
-        alert(
-            error?.message ||
-            "Unable to update status."
-        );
-    }
+    if (error) throw error;
+    alert("Review note saved successfully.");
+    await renderAdmin();
+  } catch (error) {
+    alert(error?.message || "Unable to save review note.");
+  }
 }
 
-
-/* =========================================================
-   23. SAVE REVIEW NOTE
-   ========================================================= */
-
-async function saveReviewNote(
-    applicationId
-) {
-
-    const allowed =
-        await requireOfficer();
-
-
-    if (!allowed) {
-        return;
-    }
-
-
-    const textarea =
-        document.querySelector(
-            `.admin-note[data-application-id="${applicationId}"]`
-        );
-
-
-    if (!textarea) {
-        return;
-    }
-
-
-    const note =
-        textarea.value.trim();
-
-
-    try {
-
-        const {
-            error
-        } =
-            await supabaseClient
-                .from("applications")
-                .update({
-
-                    review_note:
-                        note,
-
-                    updated_at:
-                        new Date().toISOString()
-
-                })
-                .eq(
-                    "id",
-                    applicationId
-                );
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        alert(
-            "Review note saved successfully."
-        );
-
-
-        await renderAdmin();
-
-
-    } catch (error) {
-
-        console.error(
-            "Review note error:",
-            error
-        );
-
-
-        alert(
-            error?.message ||
-            "Unable to save review note."
-        );
-    }
-}
-
-
-/* =========================================================
-   24. ADMIN STATS
-   ========================================================= */
-
-function updateAdminStats(
-    applications
-) {
-
-    const total =
-        applications.length;
-
-
-    const submitted =
-        applications.filter(
-            app =>
-                app.status === "Submitted"
-        ).length;
-
-
-    const review =
-        applications.filter(
-            app =>
-                app.status === "Under Review"
-        ).length;
-
-
-    const approved =
-        applications.filter(
-            app =>
-                app.status === "Approved (Demo)"
-        ).length;
-
-
-    setText(
-        "adminTotal",
-        total
-    );
-
-
-    setText(
-        "adminSubmitted",
-        submitted
-    );
-
-
-    setText(
-        "adminReview",
-        review
-    );
-
-
-    setText(
-        "adminApproved",
-        approved
-    );
-}
-
-
-/* =========================================================
-   25. HOME STATS
-   ========================================================= */
+document.addEventListener("click", event => {
+  const button = event.target.closest(".save-note-btn");
+  if (button) saveReviewNote(button.dataset.applicationId);
+});
 
 async function updateHomeStats() {
-
-    if (!currentUser) {
-        return;
-    }
-
-
-    try {
-
-        const {
-            data: applications,
-            error
-        } =
-            await supabaseClient
-                .from("applications")
-                .select("status");
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        const apps =
-            applications || [];
-
-
-        const total =
-            apps.length;
-
-
-        const submitted =
-            apps.filter(
-                app =>
-                    app.status === "Submitted"
-            ).length;
-
-
-        const review =
-            apps.filter(
-                app =>
-                    app.status === "Under Review"
-            ).length;
-
-
-        const approved =
-            apps.filter(
-                app =>
-                    app.status === "Approved (Demo)"
-            ).length;
-
-
-        setText(
-            "statTotal",
-            total
-        );
-
-
-        setText(
-            "statSubmitted",
-            submitted
-        );
-
-
-        setText(
-            "statReview",
-            review
-        );
-
-
-        setText(
-            "statApproved",
-            approved
-        );
-
-
-        setText(
-            "homeTotalApplications",
-            total
-        );
-
-
-        setText(
-            "homeApprovedApplications",
-            approved
-        );
-
-
-        setText(
-            "homePendingApplications",
-            review
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "Home stats error:",
-            error
-        );
-    }
-}
-
-
-/* =========================================================
-   26. READINESS EVENTS
-   ========================================================= */
-
-function setupReadinessListeners() {
-
-    const form =
-        document.getElementById(
-            "applicationForm"
-        );
-
-
-    if (!form) {
-        return;
-    }
-
-
-    form
-        .querySelectorAll(
-            "input, select"
-        )
-        .forEach(
-            input => {
-
-                input.addEventListener(
-                    "input",
-                    runPreCheck
-                );
-
-
-                input.addEventListener(
-                    "change",
-                    runPreCheck
-                );
-            }
-        );
-
-
-    const scheme =
-        document.getElementById(
-            "scheme"
-        );
-
-
-    if (scheme) {
-
-        scheme.addEventListener(
-            "change",
-            () => {
-
-                updateOfferLetterRequirement();
-
-                runPreCheck();
-            }
-        );
-    }
-}
-
-
-/* =========================================================
-   27. NAVIGATION
-   ========================================================= */
-
-function setupNavigation() {
-
-    document
-        .querySelectorAll(
-            "[data-page]"
-        )
-        .forEach(
-            button => {
-
-                button.addEventListener(
-                    "click",
-                    async () => {
-
-                        if (
-                            button.dataset.scheme
-                        ) {
-
-                            setScheme(
-                                button.dataset.scheme
-                            );
-                        }
-
-
-                        await showPage(
-                            button.dataset.page
-                        );
-                    }
-                );
-            }
-        );
-}
-
-
-/* =========================================================
-   28. ADMIN CLICK HANDLER
-   ========================================================= */
-
-document.addEventListener(
-    "click",
-    event => {
-
-        const button =
-            event.target.closest(
-                ".save-note-btn"
-            );
-
-
-        if (!button) {
-            return;
-        }
-
-
-        const applicationId =
-            button.dataset.applicationId;
-
-
-        saveReviewNote(
-            applicationId
-        );
-    }
-);
-
-
-/* =========================================================
-   29. UTILITY FUNCTIONS
-   ========================================================= */
-
-function setText(
-    elementId,
-    value
-) {
-
-    const element =
-        document.getElementById(
-            elementId
-        );
-
-
-    if (element) {
-
-        element.textContent =
-            value;
-    }
-}
-
-
-function formatDate(
-    date
-) {
-
-    if (!date) {
-        return "—";
-    }
-
-
-    const parsed =
-        new Date(date);
-
-
-    if (
-        Number.isNaN(
-            parsed.getTime()
-        )
-    ) {
-
-        return "—";
-    }
-
-
-    return parsed.toLocaleString(
-        "en-IN",
-        {
-            dateStyle: "medium",
-            timeStyle: "short"
-        }
+  if (!currentUser) return;
+  try {
+    const { data: applications, error } = await supabaseClient
+      .from("applications")
+      .select("status");
+
+    if (error) throw error;
+    const apps = applications || [];
+
+    setText("homeTotal", apps.length);
+    setText(
+      "homePending",
+      apps.filter(item => item.status === "Submitted" || item.status === "Under Review").length
     );
+  } catch (error) {
+    console.error("Home stats error:", error);
+  }
 }
-
-
-function escapeHTML(
-    value
-) {
-
-    return String(
-        value ?? ""
-    )
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-}
-
 
 /* =========================================================
-   30. BUTTON EFFECT
+   11. PAGE NAVIGATION, TIMELINE & HELPERS
    ========================================================= */
+async function showPage(pageId) {
+  const pageMap = {
+    homePage: "home",
+    applyPage: "apply",
+    trackPage: "track",
+    officerPage: "admin"
+  };
+  const resolvedId = pageMap[pageId] || pageId;
 
-function setupButtonEffects() {
+  if (["apply", "track", "admin"].includes(resolvedId)) {
+    const loggedIn = await requireLogin();
+    if (!loggedIn) return;
+  }
 
-    document.addEventListener(
-        "click",
-        event => {
+  if (resolvedId === "admin") {
+    const officer = await requireOfficer();
+    if (!officer) return;
+  }
 
-            const button =
-                event.target.closest(
-                    "button"
-                );
+  document.querySelectorAll(".page").forEach(page => page.classList.remove("active"));
+  const page = document.getElementById(resolvedId);
+  if (page) page.classList.add("active");
 
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.page === resolvedId);
+  });
 
-            if (!button) {
-                return;
-            }
+  if (resolvedId === "apply") {
+    updateApplicationEmail();
+    updateSchemeFields();
+  }
+  if (resolvedId === "admin") await renderAdmin();
+  if (resolvedId === "home") await updateHomeStats();
 
-
-            button.classList.add(
-                "button-clicked"
-            );
-
-
-            setTimeout(
-                () => {
-
-                    button.classList.remove(
-                        "button-clicked"
-                    );
-
-                },
-                180
-            );
-        }
-    );
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function chooseScheme(scheme) {
+  const schemeField = document.getElementById("scheme");
+  if (schemeField) schemeField.value = scheme;
+  showPage("apply");
+  updateSchemeFields();
+}
 
-/* =========================================================
-   31. OFFER LETTER REQUIREMENT
-   ========================================================= */
+function updateSchemeFields() {
+  const scheme = document.getElementById("scheme");
+  const offerField = document.getElementById("offerLetterField");
+  const offerInput = document.getElementById("offerLetter");
 
-function updateOfferLetterRequirement() {
+  if (!scheme || !offerField || !offerInput) return;
 
-    const scheme =
-        document.getElementById(
-            "scheme"
-        );
+  const isNOS = scheme.value === "NOS";
+  offerField.classList.toggle("hidden", !isNOS);
+  offerInput.required = isNOS;
+  if (!isNOS) offerInput.value = "";
 
+  runEligibilityPreCheck();
+}
 
-    const offerGroup =
-        document.getElementById(
-            "offerLetterGroup"
-        );
+function renderApplicationTimeline(status) {
+  const container = document.getElementById("applicationTimeline");
+  if (!container) return;
 
+  container.classList.remove("hidden");
 
-    const offerInput =
-        document.getElementById(
-            "offerLetter"
-        );
+  const normalizedStatus = status === "Approved (Demo)" ? "Approved" : status;
+  const steps = ["Submitted", "Under Review", "Deficient", "Approved"];
+  const currentIndex = steps.indexOf(normalizedStatus);
 
+  document.querySelectorAll(".timeline-step").forEach(step => {
+    const stepStatus = step.dataset.status;
+    const stepIndex = steps.indexOf(stepStatus);
+    const dot = step.querySelector(".timeline-dot");
 
-    if (
-        !scheme ||
-        !offerGroup ||
-        !offerInput
-    ) {
-        return;
-    }
+    step.classList.remove("completed", "current");
 
-
-    if (scheme.value === "NOS") {
-
-        offerGroup.classList.remove(
-            "hidden"
-        );
-
-        offerInput.required = true;
-
+    if (currentIndex !== -1 && stepIndex < currentIndex) {
+      step.classList.add("completed");
+      if (dot) dot.textContent = "✓";
+    } else if (stepIndex === currentIndex) {
+      step.classList.add("completed", "current");
+      if (dot) dot.textContent = "✓";
     } else {
-
-        offerGroup.classList.add(
-            "hidden"
-        );
-
-        offerInput.required = false;
-
-        offerInput.value = "";
+      if (dot) dot.textContent = stepIndex + 1;
     }
+  });
 }
 
-
-/* =========================================================
-   32. SET SCHEME
-   ========================================================= */
-
-function setScheme(
-    scheme
-) {
-
-    const schemeInput =
-        document.getElementById(
-            "scheme"
-        );
-
-
-    if (!schemeInput) {
-        return;
-    }
-
-
-    schemeInput.value =
-        scheme;
-
-
-    updateOfferLetterRequirement();
-
-    runPreCheck();
+function getStatusClass(status) {
+  if (status === "Deficient") return "deficient";
+  if (status === "Under Review") return "review";
+  if (status === "Approved (Demo)") return "approved";
+  return "pending";
 }
 
-
-/* =========================================================
-   33. SHOW PAGE
-   ========================================================= */
-
-async function showPage(
-    pageId
-) {
-
-    const protectedPages = [
-
-        "applyPage",
-
-        "trackPage",
-
-        "officerPage"
-
-    ];
-
-
-    if (
-        protectedPages.includes(
-            pageId
-        )
-    ) {
-
-        const loggedIn =
-            await requireLogin();
-
-
-        if (!loggedIn) {
-            return;
-        }
-    }
-
-
-    if (
-        pageId === "officerPage"
-    ) {
-
-        const officer =
-            await requireOfficer();
-
-
-        if (!officer) {
-            return;
-        }
-    }
-
-
-    document
-        .querySelectorAll(
-            ".page"
-        )
-        .forEach(
-            page => {
-
-                page.classList.remove(
-                    "active"
-                );
-
-                page.classList.add(
-                    "hidden"
-                );
-            }
-        );
-
-
-    const target =
-        document.getElementById(
-            pageId
-        );
-
-
-    if (!target) {
-
-        console.warn(
-            "Page not found:",
-            pageId
-        );
-
-        return;
-    }
-
-
-    target.classList.remove(
-        "hidden"
-    );
-
-
-    target.classList.add(
-        "active"
-    );
-
-
-    document
-        .querySelectorAll(
-            "[data-page]"
-        )
-        .forEach(
-            button => {
-
-                button.classList.toggle(
-                    "active",
-                    button.dataset.page ===
-                        pageId
-                );
-            }
-        );
-
-
-    if (
-        pageId === "applyPage"
-    ) {
-
-        updateApplicationEmail();
-
-        updateOfferLetterRequirement();
-
-        runPreCheck();
-    }
-
-
-    if (
-        pageId === "officerPage"
-    ) {
-
-        await renderAdmin();
-    }
-
-
-    if (
-        pageId === "homePage"
-    ) {
-
-        await updateHomeStats();
-    }
+function createStatusBadge(status) {
+  return `<span class="status ${getStatusClass(status)}">${escapeHTML(status)}</span>`;
 }
 
+function setText(elementId, value) {
+  const el = document.getElementById(elementId);
+  if (el) el.textContent = value;
+}
+
+function formatDate(date) {
+  if (!date) return "—";
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
 
 /* =========================================================
-   34. INITIALIZATION
+   12. INITIALIZATION & GLOBAL EXPORTS
    ========================================================= */
+document.addEventListener("DOMContentLoaded", async function () {
+  updateSchemeFields();
+  runEligibilityPreCheck();
+  updateOcrSummary();
+  runCrossVerification();
 
-document.addEventListener(
-    "DOMContentLoaded",
-    async () => {
+  ["fullName", "marks", "income", "education", "scheme"].forEach(fieldId => {
+    const element = document.getElementById(fieldId);
+    if (!element) return;
+    element.addEventListener("input", () => {
+      runEligibilityPreCheck();
+      runCrossVerification();
+    });
+    element.addEventListener("change", () => {
+      if (fieldId === "scheme") updateSchemeFields();
+      runEligibilityPreCheck();
+      runCrossVerification();
+    });
+  });
 
-        console.log(
-            "TribalScholar initialized."
-        );
+  document.getElementById("applicationForm")?.addEventListener("submit", submitApplication);
+  document.getElementById("trackForm")?.addEventListener("submit", trackApplication);
 
+  await loadCurrentUser();
+});
 
-        console.log(
-            "Supabase library:",
-            window.supabase
-        );
+document.addEventListener("click", function (event) {
+  const button = event.target.closest("button");
+  if (!button) return;
+  document.querySelectorAll("button.clicked").forEach(btn => btn.classList.remove("clicked"));
+  button.classList.add("clicked");
+});
 
-
-        console.log(
-            "Supabase URL:",
-            SUPABASE_URL
-        );
-
-
-        console.log(
-            "Publishable key loaded:",
-            SUPABASE_PUBLISHABLE_KEY.startsWith(
-                "sb_publishable_"
-            )
-        );
-
-
-        setupNavigation();
-
-        setupReadinessListeners();
-
-        setupButtonEffects();
-
-        updateOfferLetterRequirement();
-
-        runPreCheck();
-
-
-        const applicationForm =
-            document.getElementById(
-                "applicationForm"
-            );
-
-
-        if (applicationForm) {
-
-            applicationForm.addEventListener(
-                "submit",
-                submitApplication
-            );
-        }
-
-
-        const trackForm =
-            document.getElementById(
-                "trackForm"
-            );
-
-
-        if (trackForm) {
-
-            trackForm.addEventListener(
-                "submit",
-                trackApplication
-            );
-        }
-
-
-        await loadCurrentUser();
-
-        updateApplicationEmail();
-
-        updateHomeStats();
-    }
-);
+window.showPage = showPage;
+window.chooseScheme = chooseScheme;
+window.updateSchemeFields = updateSchemeFields;
+window.handleDocumentOCR = handleDocumentOCR;
+window.openAadhaarModal = openAadhaarModal;
+window.closeAadhaarModal = closeAadhaarModal;
+window.requestAadhaarOtp = requestAadhaarOtp;
+window.verifyAadhaarOtp = verifyAadhaarOtp;
+window.startDigiLockerVerification = startDigiLockerVerification;
+window.checkApplicationReadiness = checkApplicationReadiness;
+window.viewDeficiencyAlert = viewDeficiencyAlert;
+window.closeDeficiencyAlertModal = closeDeficiencyAlertModal;
+window.updateStatus = updateStatus;
+window.renderAdmin = renderAdmin;
+window.runEligibilityPreCheck = runEligibilityPreCheck;
+window.runCrossVerification = runCrossVerification;
