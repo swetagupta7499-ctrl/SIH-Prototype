@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TribalScholar | Scholarship Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<script>
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement(
+      {
+        pageLanguage: "en",
+        includedLanguages:
+          "hi,en,pa,gu,mr,bn,ta,te,kn,ml,or,as,ur,ne,sd,sa,ks,doi,mni,brx,sat",
+        layout:
+          google.translate.TranslateElement.InlineLayout.SIMPLE
+      },
+      "google_translate_element"
+    );
+  }
+</script>
+
+<script
+  src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit">
+</script>
+<body>
+
+  <header class="navbar">
+    <a class="brand" href="#" onclick="showPage('home')">
+      <span class="brand-icon">T</span>
+      <span>TribalScholar<small>Scholarship Management System</small></span>
+    </a>
+
+    <nav>
+      
+  <button class="nav-btn active"
+          data-page="home"
+          onclick="showPage('home')">
+    Home
+  </button>
+  <div id="google_translate_element"></div>
+  <button class="nav-btn"
+          data-page="apply"
+          onclick="showPage('apply')">
+    Apply
+  </button>
+
+  <button class="nav-btn"
+          data-page="track"
+          onclick="showPage('track')">
+    Track Application
+  </button>
+
+  <button class="nav-btn"
+          data-page="admin"
+          onclick="showPage('admin')">
+    Officer Portal
+  </button>
+</nav>
+  </header>
+
+  <main>
+    <!-- HOME PAGE -->
+    <section id="home" class="page active">
+      <div class="hero">
+        <div class="hero-content">
+          <span class="eyebrow">AI-ENABLED SCHOLARSHIP PLATFORM</span>
+          <h1>Empowering Tribal Students Through Education</h1>
+          <p>
+            A unified platform to apply for scholarships and fellowships,
+            check application requirements, and track progress.
+          </p>
+          <button class="primary-btn" onclick="showPage('apply')">
+            Start Application →
+          </button>
+        </div>
+
+        <div class="hero-card">
+          <div class="hero-symbol">🎓</div>
+          <h3>Your education. Your future.</h3>
+          <p>One platform for scholarship applications and tracking.</p>
+          <div class="hero-tags">
+            <span>NFST</span><span>NOS</span><span>Digital Portal</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <span>Available schemes</span>
+          <strong>02</strong>
+        </div>
+        <div class="stat-card">
+          <span>Demo applications</span>
+          <strong id="homeTotal">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Pending review</span>
+          <strong id="homePending">0</strong>
+        </div>
+      </div>
+
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">EXPLORE OPPORTUNITIES</span>
+          <h2>Scholarship Schemes</h2>
+        </div>
+      </div>
+
+      <div class="scheme-grid">
+
+        <article class="scheme-card">
+          <div class="scheme-icon">🔬</div>
+          <span class="pill">Research in India</span>
+          <h3>National Fellowship for ST Students</h3>
+          <p>
+            A fellowship scheme for eligible Scheduled Tribe students
+            pursuing research in India.
+          </p>
+          <button class="text-btn" onclick="chooseScheme('NFST')">
+            Apply for NFST →
+          </button>
+        </article>
+
+        <article class="scheme-card">
+          <div class="scheme-icon">🌍</div>
+          <span class="pill">Study Abroad</span>
+          <h3>National Overseas Scholarship</h3>
+          <p>
+            A scholarship scheme for eligible ST students pursuing
+            higher studies abroad.
+          </p>
+          <button class="text-btn" onclick="chooseScheme('NOS')">
+            Apply for NOS →
+          </button>
+        </article>
+      </div>
+      <!-- HOW IT WORKS -->
+<section class="how-section">
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">SIMPLE & TRANSPARENT</span>
+      <h2>How TribalScholar Works</h2>
+      <p class="section-subtitle">
+        Your scholarship journey, simplified in four steps.
+      </p>
+    </div>
+  </div>
+
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-number">01</div>
+      <div class="step-icon">📝</div>
+      <h3>Register & Apply</h3>
+      <p>Create your application and choose the scholarship scheme.</p>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number">02</div>
+      <div class="step-icon">📄</div>
+      <h3>Upload Documents</h3>
+      <p>Submit the documents required for your selected scheme.</p>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number">03</div>
+      <div class="step-icon">🤖</div>
+      <h3>Smart Pre-check</h3>
+      <p>Check for missing information and possible document mismatches.</p>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number">04</div>
+      <div class="step-icon">📊</div>
+      <h3>Track Progress</h3>
+      <p>Follow your application status through the student portal.</p>
+    </div>
+  </div>
+</section>
+
+<!-- KEY FEATURES -->
+<section class="features-section">
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">BUILT FOR STUDENTS</span>
+      <h2>Everything in One Place</h2>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🔍</div>
+      <h3>Document Assistance</h3>
+      <p>Identify missing fields and potential document issues.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Eligibility Pre-check</h3>
+      <p>Check application details against configured scheme rules.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🔔</div>
+      <h3>Status Updates</h3>
+      <p>Know whether your application is submitted, under review or deficient.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <h3>Responsible Review</h3>
+      <p>Keep officers involved in document review and final decisions.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CALL TO ACTION -->
+<section class="cta-section">
+  <div>
+    <span class="eyebrow">YOUR FUTURE STARTS HERE</span>
+    <h2>Take the Next Step in Your Education</h2>
+    <p>
+      Explore the available schemes and begin your application journey.
+    </p>
+  </div>
+
+  <button class="primary-btn"
+          onclick="showPage('apply')">
+    Start Your Application →
+  </button>
+</section>
+
+      <div class="notice">
+        <strong>Prototype notice:</strong>
+        This is a student-built demonstration. Scheme details, eligibility
+        rules and application statuses are sample data, not official
+        government decisions.
+      </div>
+    </section>
+
+    <!-- APPLICATION PAGE -->
+    <section id="apply" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">STUDENT PORTAL</span>
+        <h1>Scholarship Application</h1>
+        <p>Enter your details and attach the required documents.</p>
+      </div>
+
+      <form id="applicationForm" class="panel">
+        <h2>Personal Information</h2>
+
+        <div class="form-grid">
+          <label>
+            Full Name *
+            <input id="fullName" required placeholder="Enter your full name">
+          </label>
+
+          <label>
+            Email Address *
+            <input id="email" type="email" required placeholder="you@example.com">
+          </label>
+
+          <label>
+            Mobile Number *
+            <input id="phone" type="tel" required
+              pattern="[0-9]{10}" maxlength="10"
+              placeholder="10-digit mobile number">
+          </label>
+
+          <label>
+            Application Scheme *
+            <select id="scheme" required>
+              <option value="">Select a scheme</option>
+              <option value="NFST">NFST — National Fellowship</option>
+              <option value="NOS">NOS — National Overseas Scholarship</option>
+            </select>
+          </label>
+
+          <label>
+            Education Level *
+            <select id="education" required>
+              <option value="">Select education level</option>
+              <option value="Masters">Master's</option>
+              <option value="PhD">PhD / Research</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+
+          <label>
+            Annual Family Income (₹) *
+            <input id="income" type="number" min="0" required
+              placeholder="Enter annual income">
+          </label>
+
+          <label>
+            Percentage / Marks *
+            <input id="marks" type="number" min="0" max="100" step="0.01"
+              required placeholder="Enter marks or percentage">
+          </label>
+
+          <label>
+            Institution / University *
+            <input id="institution" required
+              placeholder="Enter institution name">
+          </label>
+        </div>
+        <!-- SMART APPLICATION READINESS CHECKER -->
+<div class="panel readiness-panel">
+  <span class="eyebrow">SMART APPLICATION ASSISTANCE</span>
+  <h2>Application Readiness Checker</h2>
+
+  <p>
+    Check whether your application details and required documents
+    are complete before submitting.
+  </p>
+
+  <button
+    type="button"
+    class="secondary-btn"
+    onclick="checkApplicationReadiness()">
+    Check My Application
+  </button>
+
+  <div id="readinessResult" class="readiness-result" aria-live="polite"></div>
+</div>
+
+        <h2 class="subheading">Document Upload</h2>
+        <p class="muted">
+          Attach sample documents for this prototype. File names will be
+          recorded; this demo does not upload files to a server.
+        </p>
+
+        <div class="form-grid">
+          <label>
+            ST Certificate *
+            <input id="stCertificate" type="file" required
+              accept=".pdf,.png,.jpg,.jpeg">
+          </label>
+
+          <label>
+            Marksheets / Academic Record *
+            <input id="marksheet" type="file" required
+              accept=".pdf,.png,.jpg,.jpeg">
+          </label>
+
+          <label>
+            Income Certificate *
+            <input id="incomeCertificate" type="file" required
+              accept=".pdf,.png,.jpg,.jpeg">
+          </label>
+
+          <label id="offerLetterField" class="hidden">
+            University Offer Letter
+            <input id="offerLetter" type="file"
+              accept=".pdf,.png,.jpg,.jpeg">
+          </label>
+        </div>
+
+        <div class="notice">
+          <strong>Automated pre-check:</strong>
+          The demo checks required fields and sample eligibility rules.
+          It does not verify certificate authenticity or official eligibility.
+        </div>
+
+        <button class="primary-btn" type="submit">
+          Check & Submit Application
+        </button>
+
+        <div id="formMessage" class="message hidden"></div>
+      </form>
+    </section>
+
+    <!-- TRACKING PAGE -->
+    <section id="track" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">STUDENT PORTAL</span>
+        <h1>Track Your Application</h1>
+        <p>Enter your application ID to view its current status.</p>
+      </div>
+
+      <div class="panel tracking-panel">
+        <form id="trackForm" class="track-form">
+          <input id="trackingId" required placeholder="e.g. TS260001">
+          <button class="primary-btn" type="submit">Track</button>
+        </form>
+        <div id="trackingResult"></div>
+        <!-- APPLICATION TIMELINE -->
+<div id="applicationTimeline" class="timeline-container hidden">
+  <h2>Application Timeline</h2>
+  <p class="muted">Track the progress of your application.</p>
+
+  <div class="timeline">
+    <div class="timeline-step completed" data-status="Submitted">
+      <div class="timeline-dot">✓</div>
+      <div class="timeline-content">
+        <h3>Application Submitted</h3>
+        <p>Your application has been received.</p>
+      </div>
+    </div>
+
+    <div class="timeline-step" data-status="Under Review">
+      <div class="timeline-dot">2</div>
+      <div class="timeline-content">
+        <h3>Under Review</h3>
+        <p>Your application is waiting for officer review.</p>
+      </div>
+    </div>
+
+    <div class="timeline-step" data-status="Deficient">
+      <div class="timeline-dot">3</div>
+      <div class="timeline-content">
+        <h3>Correction Required</h3>
+        <p>Please check whether additional information is required.</p>
+      </div>
+    </div>
+
+    <div class="timeline-step" data-status="Approved">
+      <div class="timeline-dot">4</div>
+      <div class="timeline-content">
+        <h3>Approved</h3>
+        <p>Your application has been marked approved in this demo.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+    </section>
+
+    <!-- OFFICER PAGE -->
+    <section id="admin" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">OFFICER PORTAL · DEMO</span>
+        <h1>Application Management</h1>
+        <p>Review submitted applications and update their workflow status.</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <span>Total applications</span>
+          <strong id="adminTotal">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Under review</span>
+          <strong id="adminReview">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Deficient</span>
+          <strong id="adminDeficient">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Approved in demo</span>
+          <strong id="adminApproved">0</strong>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="table-heading">
+          <h2>Submitted Applications</h2>
+          <button class="secondary-btn" onclick="renderAdmin()">
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Application ID</th>
+                <th>Student</th>
+                <th>Scheme</th>
+                <th>Pre-check</th>
+                <th>Status</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody id="applicationsTable"></tbody>
+          </table>
+        </div>
+
+        <p class="muted small">
+          Demo only: status changes are not official scholarship decisions.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>TribalScholar · PS 239 Prototype · For demonstration only</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
