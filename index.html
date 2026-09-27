@@ -609,10 +609,57 @@
       </button>
     </div>
   </div>
-
+   
   <footer>
     <p>TribalScholar · PS 239 Prototype · For demonstration only</p>
   </footer>
+
+  <!-- =====================================================
+       STUDY BUDDY — AI ASSISTANT WIDGET
+       Answers questions about the platform, schemes, the
+       application process, documents & general study guidance.
+       ===================================================== -->
+  <button
+    type="button"
+    id="studyBuddyLauncher"
+    class="study-buddy-launcher"
+    onclick="toggleStudyBuddy()"
+    aria-label="Open Study Buddy assistant">
+    <span class="study-buddy-launcher-icon">🎓</span>
+    <span class="study-buddy-launcher-text">Study Buddy</span>
+  </button>
+
+  <div id="studyBuddyPanel" class="study-buddy-panel hidden" role="dialog" aria-label="Study Buddy assistant">
+    <div class="study-buddy-header">
+      <div class="study-buddy-header-info">
+        <span class="study-buddy-avatar">🎓</span>
+        <div>
+          <strong>Study Buddy</strong>
+          <span>Ask about schemes, documents & applying</span>
+        </div>
+      </div>
+      <button type="button" class="study-buddy-close" onclick="toggleStudyBuddy()" aria-label="Close">×</button>
+    </div>
+
+    <div id="studyBuddyMessages" class="study-buddy-messages"></div>
+
+    <div id="studyBuddyQuickReplies" class="study-buddy-quick-replies"></div>
+
+    <form id="studyBuddyForm" class="study-buddy-input-row">
+      <input
+        id="studyBuddyInput"
+        type="text"
+        placeholder="Ask a question…"
+        autocomplete="off"
+        aria-label="Type your question">
+      <button type="submit" class="primary-btn">Send</button>
+    </form>
+
+    <p class="study-buddy-disclaimer">
+      Study Buddy answers from a built-in prototype knowledge base, not a
+      live AI model. For official guidance, contact your scholarship office.
+    </p>
+  </div>
 
   <!-- SUPABASE SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
