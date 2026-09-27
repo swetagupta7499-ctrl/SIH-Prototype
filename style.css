@@ -944,3 +944,169 @@ button.clicked:hover {
   color: white;
   box-shadow: 0 0 0 5px #dbeafe;
 }
+
+
+/* =========================================================
+   TRIBALSCHOLAR AUTH MODAL
+   ========================================================= */
+
+#authPanel {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 24px !important;
+  box-sizing: border-box !important;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(8, 25, 18, 0.94),
+      rgba(16, 48, 35, 0.90)
+    ) !important;
+
+  z-index: 999999 !important;
+
+  overflow-y: auto !important;
+}
+
+
+#authPanel .auth-overlay {
+  width: 100% !important;
+  min-height: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 24px !important;
+  box-sizing: border-box !important;
+}
+
+
+#authPanel .auth-card {
+  width: min(440px, 100%) !important;
+
+  padding: 34px !important;
+
+  background: rgba(255, 255, 255, 0.97) !important;
+
+  border-radius: 24px !important;
+
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.35) !important;
+
+  position: relative !important;
+
+  box-sizing: border-box !important;
+
+  color: #17251f !important;
+}
+
+
+#authPanel .auth-header {
+  margin-bottom: 24px !important;
+}
+
+
+#authPanel .auth-header h2 {
+  margin: 8px 0 8px !important;
+}
+
+
+#authPanel .auth-header p {
+  margin: 0 !important;
+  opacity: 0.7 !important;
+}
+
+
+#authPanel form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+
+
+#authPanel label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  font-weight: 600 !important;
+}
+
+
+#authPanel input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  padding: 13px 14px !important;
+
+  border: 1px solid #d9dfdc !important;
+  border-radius: 12px !important;
+
+  background: #ffffff !important;
+
+  color: #17251f !important;
+
+  outline: none !important;
+
+  font-size: 15px !important;
+}
+
+
+#authPanel input:focus {
+  border-color: #4d8068 !important;
+
+  box-shadow:
+    0 0 0 3px rgba(77, 128, 104, 0.12) !important;
+}
+
+
+#authPanel button {
+  box-sizing: border-box !important;
+}
+
+
+#authPanel #authSubmit {
+  width: 100% !important;
+  margin-top: 4px !important;
+}
+
+
+#authPanel #authSwitchButton {
+  width: 100% !important;
+  margin-top: 14px !important;
+}
+
+
+#authPanel .message {
+  margin-top: 4px !important;
+}
+
+
+#authPanel .hidden {
+  display: none !important;
+}
+
+
+@media (max-width: 600px) {
+
+  #authPanel {
+    padding: 16px !important;
+  }
+
+  #authPanel .auth-overlay {
+    padding: 10px !important;
+  }
+
+  #authPanel .auth-card {
+    padding: 26px 20px !important;
+    border-radius: 20px !important;
+  }
+
+}
