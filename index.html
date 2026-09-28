@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TribalScholar | Scholarship Portal</title>
   <link rel="stylesheet" href="style.css">
+  <!-- NEW: Wallet · DBT Tracker · Grievance styles -->
+  <link rel="stylesheet" href="features.css">
 
   <!-- AI-POWERED OCR ENGINE — libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
@@ -58,6 +60,19 @@
 
       <button class="nav-btn" data-page="track" onclick="showPage('track')">
         Track Application
+      </button>
+
+      <!-- NEW NAV BUTTONS -->
+      <button class="nav-btn" data-page="wallet" onclick="showPage('wallet')">
+        Wallet
+      </button>
+
+      <button class="nav-btn" data-page="payments" onclick="showPage('payments')">
+        Payments
+      </button>
+
+      <button class="nav-btn" data-page="grievance" onclick="showPage('grievance')">
+        Grievance
       </button>
 
       <button class="nav-btn" data-page="admin" onclick="showPage('admin')">
@@ -220,6 +235,27 @@
             <div class="feature-icon">🛡️</div>
             <h3>Responsible Review</h3>
             <p>Keep officers involved in document review and final decisions.</p>
+          </div>
+        </div>
+
+        <!-- NEW: three extra feature cards -->
+        <div class="features-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px;">
+          <div class="feature-card" style="cursor:pointer" onclick="showPage('wallet')">
+            <div class="feature-icon">👛</div>
+            <h3>Scholarship Wallet</h3>
+            <p>Schemes, applications, documents and payments in one profile.</p>
+          </div>
+
+          <div class="feature-card" style="cursor:pointer" onclick="showPage('payments')">
+            <div class="feature-icon">💸</div>
+            <h3>Payment / DBT Tracker</h3>
+            <p>Follow money from sanction to bank credit, step by step.</p>
+          </div>
+
+          <div class="feature-card" style="cursor:pointer" onclick="showPage('grievance')">
+            <div class="feature-icon">🎫</div>
+            <h3>Grievance Redressal</h3>
+            <p>Raise a complaint, get a ticket ID and track its resolution.</p>
           </div>
         </div>
       </section>
@@ -537,6 +573,91 @@
       </div>
     </section>
 
+    <!-- =====================================================
+         NEW: UNIFIED SCHOLARSHIP WALLET
+         ===================================================== -->
+    <section id="wallet" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">STUDENT PORTAL</span>
+        <h1>Unified Scholarship Wallet</h1>
+        <p>All your scholarships, applications, documents, payments and grievances in one profile.</p>
+      </div>
+      <div id="walletContent"></div>
+    </section>
+
+    <!-- =====================================================
+         NEW: PAYMENT / DBT TRACKER
+         ===================================================== -->
+    <section id="payments" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">PAYMENT · DBT</span>
+        <h1>Payment / DBT Tracker</h1>
+        <p>Sanctioned → Payment Initiated → DBT Processed → Credited</p>
+      </div>
+      <div id="paymentsContent"></div>
+    </section>
+
+    <!-- =====================================================
+         NEW: GRIEVANCE MANAGEMENT
+         ===================================================== -->
+    <section id="grievance" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">SUPPORT</span>
+        <h1>Grievance Management</h1>
+        <p>Raise a complaint, get a ticket ID, and follow it to resolution.</p>
+      </div>
+
+      <form id="grievanceForm" class="panel">
+        <span class="eyebrow">RAISE A COMPLAINT</span>
+        <h2>New Grievance</h2>
+
+        <div class="form-grid">
+          <label>
+            Category *
+            <select id="grvCategory" required></select>
+          </label>
+
+          <label>
+            Related Application
+            <select id="grvApplication">
+              <option value="">Not linked to an application</option>
+            </select>
+          </label>
+
+          <label>
+            Priority
+            <select id="grvPriority">
+              <option>Low</option>
+              <option selected>Normal</option>
+              <option>High</option>
+            </select>
+          </label>
+
+          <label>
+            Subject *
+            <input id="grvSubject" required maxlength="100" placeholder="Short summary of the problem">
+          </label>
+        </div>
+
+        <label style="margin-top:20px">
+          Describe the issue *
+          <textarea id="grvDescription" rows="4" required minlength="10"
+            placeholder="Explain what happened, dates, and anything the officer should know"></textarea>
+        </label>
+
+        <div id="grvRouting" class="fx-routing" aria-live="polite"></div>
+
+        <button type="submit" class="primary-btn">Submit Grievance</button>
+        <div id="grvMessage" class="message"></div>
+      </form>
+
+      <div class="fx-list-head">
+        <h2 id="grvListTitle">My Grievances</h2>
+        <input id="grvSearch" class="fx-search" type="search" placeholder="Search by ticket ID, subject, department…">
+      </div>
+      <div id="grievanceList"></div>
+    </section>
+
     <!-- OFFICER PAGE -->
     <section id="admin" class="page">
       <div class="page-heading">
@@ -641,6 +762,7 @@
 
         <p class="muted small">
           Demo only: status changes are not official scholarship decisions.
+          Approved applications automatically appear in the <strong>Payments</strong> tab.
         </p>
       </div>
     </section>
@@ -660,67 +782,7 @@
       </button>
     </div>
   </div>
-  <!-- =====================================================
-       PHASE 4: TWO-WAY COMMUNICATION & RE-UPLOAD HUB MODAL
-       ===================================================== -->
-  <div id="commHubModal" class="modal hidden">
-    <div class="modal-box comm-hub-box">
-      <div class="comm-hub-header">
-        <div>
-          <span class="eyebrow">PHASE 4 · TWO-WAY COMMUNICATION HUB</span>
-          <h3 id="commHubTitle">Application Ticket #TS260001</h3>
-          <p id="commHubMeta" class="muted small">Loading ticket details...</p>
-        </div>
-        <button type="button" class="auth-close" onclick="closeCommHub()">×</button>
-      </div>
 
-      <!-- Officer Quick Query Templates (Visible for Officer / Demo) -->
-      <div id="officerQuickQueries" class="comm-quick-bar">
-        <span class="small muted">⚡ Quick Ministry Queries:</span>
-        <button type="button" class="comm-chip" onclick="sendQuickOfficerQuery('Your Income Certificate appears expired. Please re-upload a current financial year certificate below.')">
-          Expired Income Cert
-        </button>
-        <button type="button" class="comm-chip" onclick="sendQuickOfficerQuery('Name spelling on your Marksheet does not match the application form. Please clarify or upload a corrected copy.')">
-          Name Mismatch
-        </button>
-        <button type="button" class="comm-chip" onclick="sendQuickOfficerQuery('Please upload a clearer scan of your ST Certificate for verification.')">
-          Unclear ST Cert
-        </button>
-      </div>
-
-      <!-- Ticket Conversation Thread -->
-      <div id="commHubMessages" class="comm-messages-list"></div>
-
-      <!-- Two-Way Reply Form -->
-      <form id="commReplyForm" class="comm-reply-form" onsubmit="handleTicketReply(event)">
-        <input
-          id="commReplyInput"
-          type="text"
-          placeholder="Write a reply or query on this application ticket..."
-          required
-        >
-        <button type="submit" class="primary-btn">Send Reply</button>
-      </form>
-
-      <!-- Direct Deficient Document Re-Upload Section -->
-      <div class="comm-reupload-panel">
-        <h4>📎 Re-Upload Deficient Document Directly</h4>
-        <p class="muted small">
-          Upload the corrected document under this ticket. Status will automatically update to <strong>Under Review</strong>.
-        </p>
-        <form id="commReuploadForm" class="comm-reupload-row" onsubmit="handleTicketReupload(event)">
-          <select id="reuploadDocType" required>
-            <option value="Income Certificate">Income Certificate</option>
-            <option value="ST Certificate">ST Certificate</option>
-            <option value="Marksheet">Marksheet / Academic Record</option>
-            <option value="University Offer Letter">University Offer Letter</option>
-          </select>
-          <input id="reuploadDocFile" type="file" accept=".pdf,.png,.jpg,.jpeg" required>
-          <button type="submit" class="secondary-btn">Upload &amp; Resolve</button>
-        </form>
-      </div>
-    </div>
-  </div>
   <footer>
     <p>TribalScholar · PS 239 Prototype · For demonstration only</p>
   </footer>
@@ -775,7 +837,10 @@
   <!-- SUPABASE SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- MAIN APPLICATION SCRIPT -->
+  <!-- MAIN APPLICATION SCRIPT (unchanged) -->
   <script src="script.js"></script>
+
+  <!-- NEW: Wallet · DBT Tracker · Grievance (must load AFTER script.js) -->
+  <script src="features.js"></script>
 </body>
 </html>
