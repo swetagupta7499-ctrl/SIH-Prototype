@@ -3176,3 +3176,847 @@ window.closeCommHub = closeCommHub;
 window.handleTicketReply = handleTicketReply;
 window.sendQuickOfficerQuery = sendQuickOfficerQuery;
 window.handleTicketReupload = handleTicketReupload;
+/* ===========================================================================
+   TRIBALSCHOLAR — features.js
+   1. Unified Scholarship Wallet
+   2. Payment / DBT Tracker  (Sanctioned → Payment Initiated → DBT Processed → Credited)
+   3. Grievance Management   (ticket ID, department assignment, resolution timeline)
+
+   Loads AFTER script.js. Uses its globals: currentUser, currentProfile, ocrData,
+   ELIGIBILITY_RULES, STUDY_BUDDY_KB, fetchAllApplicationsMerged, escapeHTML,
+   formatDate, createStatusBadge, requireLogin, showPage, chooseScheme.
+   Data is stored in localStorage (demo mode, no new Supabase tables needed).
+   =========================================================================== */
+(function () {
+  "use strict";
+
+  /* =========================================================
+     0. STORAGE + SMALL HELPERS
+     ========================================================= */
+  const PAYMENTS_KEY = "tribalScholarPayments";
+  const GRIEVANCE_KEY = "tribalScholarGrievances";
+  const DOCVAULT_KEY = "tribalScholarDocVault";
+
+  function readStore(key) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  function writeStore(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  const $ = id => document.getElementById(id);
+  const isOfficer = () => currentProfile?.role === "officer";
+  const inr = n => "₹" + Number(n || 0).toLocaleString("en-IN");
+  const when = iso => formatDate(iso);
+  const rand = len => Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join("");
+  const appKey = a => a.application_id || a.id;
+  const lower = s => String(s || "").toLowerCase();
+  const timeOf = iso => (iso ? new Date(iso).getTime() || 0 : 0);
+
+  function isMine(item) {
+    if (!currentUser) return false;
+    if (item.user_id && item.user_id === currentUser.id) return true;
+    if (item.userId && item.userId === currentUser.id) return true;
+    return !!item.email && lower(item.email) === lower(currentUser.email);
+  }
+
+  function emptyState(text) {
+    return `<div class="fx-empty">${escapeHTML(text)}</div>`;
+  }
+
+  /* Generic horizontal/vertical stepper used by DBT tracker + grievance timeline */
+  function stepperHtml(steps, current) {
+    const last = steps.length - 1;
+    return `<div class="fx-steps">` + steps.map((s, i) => {
+      const state = (i < current || (current === last && i === last))
+        ? "done"
+        : (i === current ? "current" : "todo");
+      return `
+        <div class="fx-step ${state}">
+          <div class="fx-dot">${state === "done" ? "✓" : i + 1}</div>
+          <div class="fx-step-label">${escapeHTML(s.label)}</div>
+          <div class="fx-step-time">${state === "todo" ? "Pending" : escapeHTML(s.time || "In progress")}</div>
+          ${s.desc ? `<div class="fx-step-desc">${escapeHTML(s.desc)}</div>` : ""}
+        </div>`;
+    }).join("") + `</div>`;
+  }
+
+  /* =========================================================
+     1. PAYMENT / DBT TRACKER — DATA LAYER
+     ========================================================= */
+  const SCHEME_AMOUNTS = {
+    NFST: 372000,   // demo sanction amount
+    NOS: 1500000    // demo sanction amount
+  };
+
+  const PAYMENT_STAGES = [
+    { label: "Sanctioned",        desc: "Sanction order issued after approval" },
+    { label: "Payment Initiated", desc: "Payment file sent to treasury / PFMS" },
+    { label: "DBT Processed",     desc: "Bank processed the Direct Benefit Transfer" },
+    { label: "Credited",          desc: "Amount credited to the student's bank account" }
+  ];
+
+  function paymentRef(stage) {
+    const y = new Date().getFullYear();
+    if (stage === 0) return `SO/${y}/${rand(5)}`;
+    if (stage === 1) return `PFMS-${y}-${rand(8)}`;
+    if (stage === 2) return `DBT-${rand(10)}`;
+    return `UTR${rand(12)}`;
+  }
+
+  /* Every approved application automatically gets a payment record at stage 0 */
+  function syncPayments(allApps) {
+    const pays = readStore(PAYMENTS_KEY);
+    let changed = false;
+
+    allApps
+      .filter(a => a.status === "Approved (Demo)")
+      .forEach(a => {
+        const id = appKey(a);
+        if (pays.some(p => p.applicationId === id)) return;
+
+        const now = new Date().toISOString();
+        let payId = "PAY" + rand(6);
+        while (pays.some(p => p.id === payId)) payId = "PAY" + rand(6);
+        const sanctionOrder = paymentRef(0);
+
+        pays.push({
+          id: payId,
+          applicationId: id,
+          scheme: a.scheme,
+          studentName: a.name,
+          userId: a.user_id || null,
+          email: a.email || "",
+          amount: SCHEME_AMOUNTS[a.scheme] || 100000,
+          stage: 0,
+          sanctionOrder,
+          history: [{ stage: 0, at: now, ref: sanctionOrder, note: PAYMENT_STAGES[0].desc }]
+        });
+        changed = true;
+      });
+
+    if (changed) writeStore(PAYMENTS_KEY, pays);
+    return pays;
+  }
+
+  function advancePayment(id) {
+    if (!isOfficer()) {
+      alert("Only officers can update payment stages.");
+      return;
+    }
+    const pays = readStore(PAYMENTS_KEY);
+    const p = pays.find(x => x.id === id);
+    if (!p || p.stage >= 3) return;
+
+    const note = $("fx-paynote-" + id)?.value.trim() || "";
+    p.stage += 1;
+    p.history.push({
+      stage: p.stage,
+      at: new Date().toISOString(),
+      ref: paymentRef(p.stage),
+      note: note || PAYMENT_STAGES[p.stage].desc
+    });
+    writeStore(PAYMENTS_KEY, pays);
+    renderPayments();
+  }
+
+  function stageBadge(stage) {
+    return `<span class="fx-badge stage-${stage}">${escapeHTML(PAYMENT_STAGES[stage].label)}</span>`;
+  }
+
+  function lastUpdate(p) {
+    return p.history[p.history.length - 1]?.at || null;
+  }
+
+  function paymentCard(p, officerView) {
+    const steps = PAYMENT_STAGES.map((s, i) => {
+      const h = p.history.find(x => x.stage === i);
+      return { label: s.label, desc: s.desc, time: h ? when(h.at) : "" };
+    });
+
+    const historyRows = p.history.map(h => `
+      <li>
+        <strong>${escapeHTML(PAYMENT_STAGES[h.stage].label)}</strong>
+        · ${escapeHTML(when(h.at))}
+        · Ref: <code>${escapeHTML(h.ref)}</code>
+        ${h.note ? `<div class="muted small-note">${escapeHTML(h.note)}</div>` : ""}
+      </li>`).join("");
+
+    const next = PAYMENT_STAGES[p.stage + 1];
+    const action = officerView && next
+      ? `
+        <div class="fx-officer-box">
+          <input type="text" id="fx-paynote-${escapeHTML(p.id)}" placeholder="Optional remark for this stage">
+          <button type="button" class="primary-btn"
+            data-fx-action="advance-payment" data-id="${escapeHTML(p.id)}">
+            Mark as ${escapeHTML(next.label)} →
+          </button>
+        </div>`
+      : "";
+
+    return `
+      <article class="panel fx-card">
+        <div class="fx-card-head">
+          <div>
+            <span class="eyebrow">PAYMENT ${escapeHTML(p.id)}</span>
+            <h3>${escapeHTML(ELIGIBILITY_RULES[p.scheme]?.name || p.scheme)}</h3>
+            <p class="muted">
+              ${officerView ? escapeHTML(p.studentName) + " · " : ""}Application ${escapeHTML(p.applicationId)}
+              · Sanction order <code>${escapeHTML(p.sanctionOrder)}</code>
+            </p>
+          </div>
+          <div class="fx-amount">${inr(p.amount)}${stageBadge(p.stage)}</div>
+        </div>
+        ${stepperHtml(steps, p.stage)}
+        <details class="fx-details">
+          <summary>Transaction history &amp; reference numbers</summary>
+          <ul class="fx-history">${historyRows}</ul>
+        </details>
+        ${action}
+      </article>`;
+  }
+
+  async function renderPayments() {
+    const box = $("paymentsContent");
+    if (!box) return;
+    box.innerHTML = `<div class="panel muted">Loading payments…</div>`;
+
+    const all = await fetchAllApplicationsMerged();
+    let pays = syncPayments(all);
+    const officerView = isOfficer();
+    if (!officerView) pays = pays.filter(isMine);
+
+    pays = [...pays].sort((a, b) => timeOf(lastUpdate(b)) - timeOf(lastUpdate(a)));
+
+    const sum = list => list.reduce((t, p) => t + p.amount, 0);
+    const byStage = s => pays.filter(p => p.stage === s);
+
+    const summary = `
+      <div class="fx-summary">
+        ${PAYMENT_STAGES.map((s, i) => `
+          <div class="fx-summary-card stage-${i}">
+            <strong>${byStage(i).length}</strong>
+            <span>${escapeHTML(s.label)}</span>
+            <small>${inr(sum(byStage(i)))}</small>
+          </div>`).join("")}
+      </div>`;
+
+    const intro = officerView
+      ? `<p class="muted">Officer view: move each sanctioned payment forward through the DBT pipeline. Students see updates instantly.</p>`
+      : `<p class="muted">Track every sanctioned scholarship payment from sanction to bank credit. Payments appear here once an application is approved.</p>`;
+
+    const cards = pays.length
+      ? pays.map(p => paymentCard(p, officerView)).join("")
+      : `<div class="panel">${emptyState(
+          officerView
+            ? "No approved applications yet. Approve an application in the Officer Portal to generate a payment."
+            : "No sanctioned payments yet. Once an officer approves your application, its payment will show up here."
+        )}</div>`;
+
+    box.innerHTML = intro + summary + cards + `
+      <div class="notice">
+        <strong>Prototype notice:</strong> This is a simulated DBT pipeline. Amounts and reference
+        numbers are sample data and are not linked to PFMS or any real bank.
+      </div>`;
+  }
+
+  /* =========================================================
+     2. GRIEVANCE MANAGEMENT
+     ========================================================= */
+  const GRIEVANCE_CATEGORIES = {
+    application: { label: "Application / Document issue", department: "Scholarship Verification Cell", sla: 5,  priority: "Normal" },
+    payment:     { label: "Payment / DBT delay",           department: "Finance & DBT Cell",           sla: 7,  priority: "High" },
+    eligibility: { label: "Eligibility / Rule dispute",    department: "Nodal Officer — Scheme Section", sla: 10, priority: "Normal" },
+    technical:   { label: "Portal / Technical problem",    department: "IT Support Desk",              sla: 3,  priority: "Normal" },
+    institution: { label: "Institution / College issue",   department: "Institutional Nodal Officer",  sla: 7,  priority: "Normal" },
+    other:       { label: "Other",                         department: "General Grievance Cell",       sla: 10, priority: "Low" }
+  };
+
+  const DEPARTMENTS = [...new Set(Object.values(GRIEVANCE_CATEGORIES).map(c => c.department))];
+  const GRIEVANCE_STATUSES = ["Assigned", "In Progress", "Resolved"];
+  const GRIEVANCE_STEPS = ["Raised", "Assigned", "In Progress", "Resolved"];
+
+  function isOverdue(t) {
+    return t.status !== "Resolved" && Date.now() > timeOf(t.dueAt);
+  }
+
+  function createTicketId(list) {
+    const yy = String(new Date().getFullYear()).slice(-2);
+    let n = 1001 + list.length;
+    let id = `GRV${yy}${n}`;
+    while (list.some(t => t.ticketId === id)) {
+      n += 1;
+      id = `GRV${yy}${n}`;
+    }
+    return id;
+  }
+
+  function updateRoutingPreview() {
+    const cat = GRIEVANCE_CATEGORIES[$("grvCategory")?.value];
+    const box = $("grvRouting");
+    if (!box) return;
+    if (!cat) {
+      box.innerHTML = "";
+      return;
+    }
+    box.innerHTML = `Will be routed to <strong>${escapeHTML(cat.department)}</strong>
+      · target resolution within <strong>${cat.sla} days</strong>`;
+    const pr = $("grvPriority");
+    if (pr && !pr.dataset.touched) pr.value = cat.priority;
+  }
+
+  async function handleGrievanceSubmit(event) {
+    event.preventDefault();
+    if (!(await requireLogin())) return;
+
+    const catKey = $("grvCategory").value;
+    const cat = GRIEVANCE_CATEGORIES[catKey];
+    const subject = $("grvSubject").value.trim();
+    const description = $("grvDescription").value.trim();
+    const msg = $("grvMessage");
+
+    if (!cat || !subject || description.length < 10) {
+      msg.textContent = "Please choose a category, add a subject and describe the issue (at least 10 characters).";
+      msg.className = "message error";
+      return;
+    }
+
+    const list = readStore(GRIEVANCE_KEY);
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const due = new Date(now.getTime() + cat.sla * 86400000).toISOString();
+    const ticketId = createTicketId(list);
+
+    list.unshift({
+      ticketId,
+      userId: currentUser.id,
+      email: currentUser.email,
+      studentName: currentProfile?.full_name || currentUser.email,
+      category: catKey,
+      subject,
+      description,
+      priority: $("grvPriority").value,
+      applicationId: $("grvApplication").value || "",
+      department: cat.department,
+      status: "Assigned",
+      createdAt: nowIso,
+      dueAt: due,
+      resolvedAt: null,
+      response: "",
+      history: [
+        { status: "Raised", at: nowIso, note: "Grievance registered by student", by: "Student" },
+        { status: "Assigned", at: nowIso, note: `Auto-assigned to ${cat.department}`, by: "System" }
+      ]
+    });
+    writeStore(GRIEVANCE_KEY, list);
+
+    msg.textContent = `Grievance registered! Ticket ID: ${ticketId} · Assigned to ${cat.department} · Target resolution by ${new Date(due).toLocaleDateString("en-IN", { dateStyle: "medium" })}.`;
+    msg.className = "message success";
+
+    $("grievanceForm").reset();
+    const pr = $("grvPriority");
+    if (pr) delete pr.dataset.touched;
+    updateRoutingPreview();
+    renderGrievanceList();
+  }
+
+  function saveTicket(id) {
+    if (!isOfficer()) {
+      alert("Only officers can update grievances.");
+      return;
+    }
+    const list = readStore(GRIEVANCE_KEY);
+    const t = list.find(x => x.ticketId === id);
+    if (!t) return;
+
+    const status = $("fx-gs-" + id).value;
+    const dept = $("fx-gd-" + id).value;
+    const note = $("fx-gr-" + id).value.trim();
+    const now = new Date().toISOString();
+    const by = currentProfile?.full_name || "Officer";
+
+    if (dept !== t.department) {
+      t.history.push({ status: t.status, at: now, note: `Reassigned from ${t.department} to ${dept}`, by });
+      t.department = dept;
+    }
+    if (status !== t.status) {
+      t.status = status;
+      t.resolvedAt = status === "Resolved" ? now : null;
+      t.history.push({ status, at: now, note: note || `Status changed to ${status}`, by });
+    } else if (note) {
+      t.history.push({ status: t.status, at: now, note, by });
+    }
+    if (note) t.response = note;
+
+    writeStore(GRIEVANCE_KEY, list);
+    renderGrievanceList();
+  }
+
+  function reopenTicket(id) {
+    const list = readStore(GRIEVANCE_KEY);
+    const t = list.find(x => x.ticketId === id);
+    if (!t || t.status !== "Resolved") return;
+    const now = new Date();
+    t.status = "Assigned";
+    t.resolvedAt = null;
+    t.dueAt = new Date(now.getTime() + 3 * 86400000).toISOString();
+    t.history.push({ status: "Assigned", at: now.toISOString(), note: "Reopened by student — fresh 3-day target set", by: "Student" });
+    writeStore(GRIEVANCE_KEY, list);
+    renderGrievanceList();
+  }
+
+  function ticketCard(t, officerView) {
+    const cat = GRIEVANCE_CATEGORIES[t.category];
+    const current = Math.max(GRIEVANCE_STEPS.indexOf(t.status), 0);
+    const steps = GRIEVANCE_STEPS.map(label => {
+      const h = t.history.find(x => x.status === label);
+      return { label, time: h ? when(h.at) : "" };
+    });
+    const overdue = isOverdue(t);
+
+    const historyRows = t.history.map(h => `
+      <li>
+        <strong>${escapeHTML(h.status)}</strong> · ${escapeHTML(when(h.at))} · ${escapeHTML(h.by || "")}
+        <div class="muted small-note">${escapeHTML(h.note)}</div>
+      </li>`).join("");
+
+    const officerBox = officerView
+      ? `
+        <div class="fx-officer-box grid">
+          <select id="fx-gs-${escapeHTML(t.ticketId)}" aria-label="Status">
+            ${GRIEVANCE_STATUSES.map(s => `<option ${t.status === s ? "selected" : ""}>${s}</option>`).join("")}
+          </select>
+          <select id="fx-gd-${escapeHTML(t.ticketId)}" aria-label="Department">
+            ${DEPARTMENTS.map(d => `<option ${t.department === d ? "selected" : ""}>${escapeHTML(d)}</option>`).join("")}
+          </select>
+          <input type="text" id="fx-gr-${escapeHTML(t.ticketId)}" placeholder="Response / resolution note for the student">
+          <button type="button" class="primary-btn" data-fx-action="save-ticket" data-id="${escapeHTML(t.ticketId)}">Update Ticket</button>
+        </div>`
+      : (t.status === "Resolved"
+          ? `<button type="button" class="secondary-btn" data-fx-action="reopen-ticket" data-id="${escapeHTML(t.ticketId)}">Not satisfied? Reopen</button>`
+          : "");
+
+    return `
+      <article class="panel fx-card">
+        <div class="fx-card-head">
+          <div>
+            <span class="eyebrow">TICKET ${escapeHTML(t.ticketId)}</span>
+            <h3>${escapeHTML(t.subject)}</h3>
+            <p class="muted">
+              ${officerView ? escapeHTML(t.studentName) + " · " : ""}${escapeHTML(cat?.label || t.category)}
+              ${t.applicationId ? " · Application " + escapeHTML(t.applicationId) : ""}
+            </p>
+          </div>
+          <div class="fx-badges">
+            <span class="fx-badge grv-${lower(t.status).replace(/\s+/g, "-")}">${escapeHTML(t.status)}</span>
+            <span class="fx-badge prio-${lower(t.priority)}">${escapeHTML(t.priority)} priority</span>
+            ${overdue ? `<span class="fx-badge overdue">⏰ Overdue — escalated</span>` : ""}
+          </div>
+        </div>
+
+        <div class="fx-meta">
+          <div><span>Department</span><strong>${escapeHTML(t.department)}</strong></div>
+          <div><span>Raised</span><strong>${escapeHTML(when(t.createdAt))}</strong></div>
+          <div><span>${t.status === "Resolved" ? "Resolved" : "Target resolution"}</span>
+            <strong>${escapeHTML(when(t.status === "Resolved" ? t.resolvedAt : t.dueAt))}</strong></div>
+        </div>
+
+        <p class="fx-desc">${escapeHTML(t.description)}</p>
+        ${stepperHtml(steps, current)}
+        ${t.response ? `<div class="fx-response"><strong>Latest response:</strong> ${escapeHTML(t.response)}</div>` : ""}
+
+        <details class="fx-details">
+          <summary>Full activity log</summary>
+          <ul class="fx-history">${historyRows}</ul>
+        </details>
+        ${officerBox}
+      </article>`;
+  }
+
+  function renderGrievanceList() {
+    const box = $("grievanceList");
+    if (!box) return;
+
+    const officerView = isOfficer();
+    let list = readStore(GRIEVANCE_KEY);
+    if (!officerView) list = list.filter(isMine);
+
+    const q = lower($("grvSearch")?.value.trim());
+    const visible = list.filter(t =>
+      !q || [t.ticketId, t.subject, t.department, t.status].some(v => lower(v).includes(q))
+    );
+
+    const count = s => list.filter(t => t.status === s).length;
+    const overdue = list.filter(isOverdue).length;
+
+    const stats = `
+      <div class="fx-summary">
+        <div class="fx-summary-card"><strong>${list.length}</strong><span>Total tickets</span></div>
+        <div class="fx-summary-card"><strong>${count("Assigned")}</strong><span>Assigned</span></div>
+        <div class="fx-summary-card"><strong>${count("In Progress")}</strong><span>In progress</span></div>
+        <div class="fx-summary-card"><strong>${count("Resolved")}</strong><span>Resolved</span></div>
+        <div class="fx-summary-card overdue"><strong>${overdue}</strong><span>Overdue</span></div>
+      </div>`;
+
+    box.innerHTML = stats + (visible.length
+      ? visible.map(t => ticketCard(t, officerView)).join("")
+      : `<div class="panel">${emptyState(
+          list.length ? "No tickets match your search." : "No grievances yet. Use the form above to raise one."
+        )}</div>`);
+  }
+
+  async function renderGrievance() {
+    const cat = $("grvCategory");
+    if (cat) {
+      const prev = cat.value;
+      cat.innerHTML = `<option value="">Select a category</option>` +
+        Object.entries(GRIEVANCE_CATEGORIES)
+          .map(([k, c]) => `<option value="${k}">${escapeHTML(c.label)}</option>`).join("");
+      cat.value = prev;
+    }
+
+    const appSel = $("grvApplication");
+    if (appSel) {
+      const prev = appSel.value;
+      const apps = (await fetchAllApplicationsMerged()).filter(isMine);
+      appSel.innerHTML = `<option value="">Not linked to an application</option>` +
+        apps.map(a => `<option value="${escapeHTML(appKey(a))}">${escapeHTML(appKey(a))} — ${escapeHTML(a.scheme)}</option>`).join("");
+      appSel.value = prev;
+    }
+
+    const title = $("grvListTitle");
+    if (title) title.textContent = isOfficer() ? "All Grievances (Officer View)" : "My Grievances";
+
+    updateRoutingPreview();
+    renderGrievanceList();
+  }
+
+  /* =========================================================
+     3. UNIFIED SCHOLARSHIP WALLET
+     ========================================================= */
+  const DOC_FIELDS = [
+    { id: "stCertificate",     type: "ST Certificate",     ocr: "stCertificate" },
+    { id: "marksheet",         type: "Marksheet",          ocr: "marksheet" },
+    { id: "incomeCertificate", type: "Income Certificate", ocr: "incomeCertificate" },
+    { id: "offerLetter",       type: "Offer Letter",       ocr: null }
+  ];
+
+  /* Remember uploaded documents when the application form is submitted */
+  function captureDocuments() {
+    if (!currentUser) return;
+    const scheme = $("scheme")?.value || "";
+    const vault = readStore(DOCVAULT_KEY);
+    const now = new Date().toISOString();
+
+    DOC_FIELDS.forEach(f => {
+      const file = $(f.id)?.files?.[0];
+      if (!file) return;
+      vault.unshift({
+        userId: currentUser.id,
+        email: currentUser.email,
+        type: f.type,
+        filename: file.name,
+        sizeKb: Math.max(1, Math.round(file.size / 1024)),
+        scheme,
+        at: now,
+        confidence: f.ocr && ocrData[f.ocr] ? ocrData[f.ocr].confidence : null
+      });
+    });
+    writeStore(DOCVAULT_KEY, vault.slice(0, 200));
+  }
+
+  document.addEventListener("submit", event => {
+    if (event.target && event.target.id === "applicationForm") captureDocuments();
+  }, true);
+
+  async function collectDocuments(apps) {
+    const docs = readStore(DOCVAULT_KEY).filter(isMine).map(d => ({
+      type: d.type,
+      filename: d.filename,
+      at: d.at,
+      scheme: d.scheme,
+      confidence: d.confidence,
+      source: "This device"
+    }));
+
+    // Real Supabase users: also list files stored in the private bucket
+    if (currentUser && !currentUser.is_fallback) {
+      const ids = apps.map(a => a.id).filter(id => id && !String(id).startsWith("TS"));
+      if (ids.length) {
+        try {
+          const { data } = await supabaseClient
+            .from("application_documents")
+            .select("*")
+            .in("application_id", ids);
+          (data || []).forEach(d => {
+            if (docs.some(x => x.type === d.document_type && x.filename === d.original_filename)) return;
+            const parent = apps.find(a => a.id === d.application_id);
+            docs.push({
+              type: d.document_type,
+              filename: d.original_filename,
+              at: d.uploaded_at || d.created_at || null,
+              scheme: parent?.scheme || "",
+              confidence: null,
+              source: "Secure storage"
+            });
+          });
+        } catch (e) {
+          console.warn("Could not load stored documents:", e);
+        }
+      }
+    }
+    return docs.sort((a, b) => timeOf(b.at) - timeOf(a.at));
+  }
+
+  function walletId() {
+    const raw = String(currentUser?.id || "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+    return "TSW-" + (raw.slice(-8) || "00000000");
+  }
+
+  function initials(name) {
+    return String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2)
+      .map(w => w[0].toUpperCase()).join("") || "?";
+  }
+
+  async function renderWallet() {
+    const box = $("walletContent");
+    if (!box) return;
+    box.innerHTML = `<div class="panel muted">Loading your wallet…</div>`;
+
+    const all = await fetchAllApplicationsMerged();
+    const allPays = syncPayments(all);
+    const apps = all.filter(isMine).sort((a, b) => timeOf(b.submitted_at) - timeOf(a.submitted_at));
+    const pays = allPays.filter(isMine);
+    const grvs = readStore(GRIEVANCE_KEY).filter(isMine);
+    const docs = await collectDocuments(apps);
+
+    const name = currentProfile?.full_name || currentUser.email;
+    const role = currentProfile?.role || "student";
+    const sanctioned = pays.reduce((t, p) => t + p.amount, 0);
+    const credited = pays.filter(p => p.stage === 3).reduce((t, p) => t + p.amount, 0);
+    const awaiting = sanctioned - credited;
+    const approved = apps.filter(a => a.status === "Approved (Demo)").length;
+    const openGrv = grvs.filter(t => t.status !== "Resolved").length;
+    const payOf = a => pays.find(p => p.applicationId === appKey(a));
+
+    /* Header + summary */
+    const header = `
+      <div class="panel fx-wallet-head">
+        <div class="fx-avatar">${escapeHTML(initials(name))}</div>
+        <div class="fx-wallet-id">
+          <h2>${escapeHTML(name)}</h2>
+          <p class="muted">${escapeHTML(currentUser.email || "")} · Wallet ID <code>${escapeHTML(walletId())}</code>
+            · <span class="user-role">${escapeHTML(role)}</span></p>
+        </div>
+        <div class="fx-quick">
+          <button type="button" class="secondary-btn" data-fx-action="goto" data-page="apply">+ New Application</button>
+          <button type="button" class="secondary-btn" data-fx-action="goto" data-page="payments">View Payments</button>
+          <button type="button" class="secondary-btn" data-fx-action="goto" data-page="grievance">Raise Grievance</button>
+        </div>
+      </div>
+      ${role === "officer" ? `<div class="notice">You are signed in as an officer. The wallet shows your own student profile — switch to a student account to see a full wallet.</div>` : ""}
+      <div class="fx-summary">
+        <div class="fx-summary-card"><strong>${apps.length}</strong><span>Applications</span></div>
+        <div class="fx-summary-card stage-3"><strong>${approved}</strong><span>Approved</span></div>
+        <div class="fx-summary-card"><strong>${inr(sanctioned)}</strong><span>Total sanctioned</span></div>
+        <div class="fx-summary-card stage-3"><strong>${inr(credited)}</strong><span>Credited to bank</span></div>
+        <div class="fx-summary-card stage-1"><strong>${inr(awaiting)}</strong><span>Awaiting credit</span></div>
+        <div class="fx-summary-card ${openGrv ? "overdue" : ""}"><strong>${openGrv}</strong><span>Open grievances</span></div>
+      </div>`;
+
+    /* Scholarships */
+    const schemeCards = Object.entries(ELIGIBILITY_RULES).map(([key, rule]) => {
+      const mine = apps.filter(a => a.scheme === key);
+      const latest = mine[0];
+      const pay = latest ? payOf(latest) : null;
+      return `
+        <div class="fx-scheme">
+          <span class="pill">${escapeHTML(key)}</span>
+          <h3>${escapeHTML(rule.name)}</h3>
+          ${latest
+            ? `<div class="fx-scheme-row"><span>Latest application</span><strong>${escapeHTML(appKey(latest))}</strong></div>
+               <div class="fx-scheme-row"><span>Status</span>${createStatusBadge(latest.status)}</div>
+               <div class="fx-scheme-row"><span>Payment</span>${pay ? stageBadge(pay.stage) : "<em>Not sanctioned yet</em>"}</div>
+               ${pay ? `<div class="fx-scheme-row"><span>Amount</span><strong>${inr(pay.amount)}</strong></div>` : ""}
+               <button type="button" class="text-btn" data-fx-action="goto" data-page="track">Track application →</button>`
+            : `<p class="muted">You haven't applied for this scheme yet.</p>
+               <button type="button" class="primary-btn" data-fx-action="apply" data-scheme="${escapeHTML(key)}">Apply now →</button>`}
+        </div>`;
+    }).join("");
+
+    /* Applications table */
+    const appRows = apps.map(a => {
+      const pay = payOf(a);
+      const issues = Array.isArray(a.issues) ? a.issues.length : 0;
+      return `
+        <tr>
+          <td><strong>${escapeHTML(appKey(a))}</strong></td>
+          <td>${escapeHTML(a.scheme)}</td>
+          <td>${escapeHTML(when(a.submitted_at))}</td>
+          <td>${createStatusBadge(a.status)}</td>
+          <td>${issues ? `${issues} issue(s)` : "Clean"}</td>
+          <td>${pay ? stageBadge(pay.stage) : "—"}</td>
+        </tr>`;
+    }).join("");
+
+    /* Documents table */
+    const docRows = docs.map(d => `
+      <tr>
+        <td><strong>${escapeHTML(d.type)}</strong></td>
+        <td>${escapeHTML(d.filename)}</td>
+        <td>${escapeHTML(d.scheme || "—")}</td>
+        <td>${d.confidence != null ? escapeHTML(d.confidence + "% OCR") : "—"}</td>
+        <td>${escapeHTML(when(d.at))}</td>
+        <td>${escapeHTML(d.source)}</td>
+      </tr>`).join("");
+
+    /* Payments table */
+    const payRows = pays.map(p => `
+      <tr>
+        <td><strong>${escapeHTML(p.id)}</strong></td>
+        <td>${escapeHTML(p.applicationId)}</td>
+        <td>${inr(p.amount)}</td>
+        <td>${stageBadge(p.stage)}</td>
+        <td>${escapeHTML(when(lastUpdate(p)))}</td>
+      </tr>`).join("");
+
+    /* Grievances table */
+    const grvRows = grvs.map(t => `
+      <tr>
+        <td><strong>${escapeHTML(t.ticketId)}</strong></td>
+        <td>${escapeHTML(t.subject)}</td>
+        <td>${escapeHTML(t.department)}</td>
+        <td><span class="fx-badge grv-${lower(t.status).replace(/\s+/g, "-")}">${escapeHTML(t.status)}</span></td>
+        <td>${escapeHTML(when(t.status === "Resolved" ? t.resolvedAt : t.dueAt))}</td>
+      </tr>`).join("");
+
+    /* Unified activity feed */
+    const events = [];
+    apps.forEach(a => {
+      events.push({ at: a.submitted_at, icon: "📝", text: `Application ${appKey(a)} submitted for ${a.scheme}` });
+      if (a.status !== "Submitted" && a.updated_at && a.updated_at !== a.submitted_at) {
+        events.push({ at: a.updated_at, icon: "🔄", text: `Application ${appKey(a)} marked ${a.status}` });
+      }
+    });
+    docs.forEach(d => events.push({ at: d.at, icon: "📄", text: `${d.type} uploaded (${d.filename})` }));
+    pays.forEach(p => p.history.forEach(h =>
+      events.push({ at: h.at, icon: "💸", text: `${PAYMENT_STAGES[h.stage].label}: ${inr(p.amount)} for ${p.applicationId}` })));
+    grvs.forEach(t => t.history.forEach(h =>
+      events.push({ at: h.at, icon: "🎫", text: `Ticket ${t.ticketId} — ${h.status}: ${h.note}` })));
+    events.sort((a, b) => timeOf(b.at) - timeOf(a.at));
+
+    const feed = events.length
+      ? `<ul class="fx-feed">${events.slice(0, 12).map(e => `
+          <li><span class="fx-feed-icon">${e.icon}</span>
+            <div><strong>${escapeHTML(e.text)}</strong><small>${escapeHTML(when(e.at))}</small></div></li>`).join("")}</ul>`
+      : emptyState("No activity yet. Apply for a scholarship to get started.");
+
+    const table = (heads, rows, empty) => rows
+      ? `<div class="table-wrap"><table><thead><tr>${heads.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
+      : emptyState(empty);
+
+    box.innerHTML = `
+      ${header}
+
+      <div class="panel">
+        <span class="eyebrow">SCHOLARSHIPS</span>
+        <h2>My Scholarship Schemes</h2>
+        <div class="fx-scheme-grid">${schemeCards}</div>
+      </div>
+
+      <div class="panel">
+        <span class="eyebrow">APPLICATIONS</span>
+        <h2>My Applications</h2>
+        ${table(["Application", "Scheme", "Submitted", "Status", "Pre-check", "Payment"], appRows, "No applications yet.")}
+      </div>
+
+      <div class="panel">
+        <span class="eyebrow">DOCUMENT VAULT</span>
+        <h2>My Documents</h2>
+        ${table(["Type", "File", "Scheme", "OCR", "Uploaded", "Stored in"], docRows, "No documents uploaded yet.")}
+      </div>
+
+      <div class="panel">
+        <span class="eyebrow">PAYMENTS · DBT</span>
+        <h2>My Payments</h2>
+        ${table(["Payment ID", "Application", "Amount", "Stage", "Last update"], payRows, "No payments sanctioned yet.")}
+      </div>
+
+      <div class="panel">
+        <span class="eyebrow">GRIEVANCES</span>
+        <h2>My Grievance Tickets</h2>
+        ${table(["Ticket", "Subject", "Department", "Status", "Due / Resolved"], grvRows, "No grievances raised.")}
+      </div>
+
+      <div class="panel">
+        <span class="eyebrow">ACTIVITY</span>
+        <h2>Recent Activity</h2>
+        ${feed}
+      </div>`;
+  }
+
+  /* =========================================================
+     4. WIRING: navigation, events, Study Buddy
+     ========================================================= */
+  const FX_PAGES = {
+    wallet: renderWallet,
+    payments: renderPayments,
+    grievance: renderGrievance
+  };
+
+  // Wrap showPage so the new pages require login and render fresh data
+  const originalShowPage = window.showPage;
+  window.showPage = async function (pageId) {
+    if (FX_PAGES[pageId]) {
+      const ok = await requireLogin();
+      if (!ok) return;
+    }
+    await originalShowPage(pageId);
+    if (FX_PAGES[pageId]) await FX_PAGES[pageId]();
+  };
+
+  document.addEventListener("click", event => {
+    const el = event.target.closest("[data-fx-action]");
+    if (!el) return;
+    const action = el.dataset.fxAction;
+    if (action === "goto") window.showPage(el.dataset.page);
+    if (action === "apply") chooseScheme(el.dataset.scheme);
+    if (action === "advance-payment") advancePayment(el.dataset.id);
+    if (action === "save-ticket") saveTicket(el.dataset.id);
+    if (action === "reopen-ticket") reopenTicket(el.dataset.id);
+  });
+
+  $("grievanceForm")?.addEventListener("submit", handleGrievanceSubmit);
+  $("grvCategory")?.addEventListener("change", updateRoutingPreview);
+  $("grvPriority")?.addEventListener("change", e => { e.target.dataset.touched = "1"; });
+  $("grvSearch")?.addEventListener("input", renderGrievanceList);
+
+  // Teach Study Buddy about the new features
+  if (typeof STUDY_BUDDY_KB !== "undefined") {
+    STUDY_BUDDY_KB.push(
+      {
+        id: "wallet",
+        keywords: ["wallet", "scholarship wallet", "my profile", "my documents", "all my scholarships"],
+        answer:
+          "The Scholarship Wallet is your one-stop profile: all your schemes, applications, uploaded documents, payments and grievance tickets in one place, plus a recent-activity feed. Open the \"Wallet\" tab after logging in."
+      },
+      {
+        id: "payments",
+        keywords: ["payment", "payments", "dbt", "credited", "when will i get money", "payment status", "stipend", "scholarship money", "bank credit"],
+        answer:
+          "Once an application is approved, its payment moves through 4 stages:\n1. Sanctioned\n2. Payment Initiated\n3. DBT Processed\n4. Credited\n\nOpen the \"Payments\" tab to see the live tracker and reference numbers. This is a simulated pipeline for the demo."
+      },
+      {
+        id: "grievance",
+        keywords: ["grievance", "complaint", "complain", "ticket", "raise issue", "raise a complaint", "report a problem"],
+        answer:
+          "To raise a complaint, open the \"Grievance\" tab, pick a category and describe the issue. You'll get a ticket ID, it is auto-assigned to the right department, and you can follow the resolution timeline. Overdue tickets are flagged as escalated, and resolved tickets can be reopened."
+      }
+    );
+  }
+})();
