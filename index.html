@@ -564,6 +564,57 @@
         </div>
       </div>
 
+      <!-- AI PRIORITY QUEUE -->
+      <div class="panel" id="priorityQueuePanel">
+        <span class="eyebrow">AI PRIORITY QUEUE</span>
+        <h2>Smart Triage of Pending Applications</h2>
+        <p class="muted">
+          Applications are auto-sorted by risk: Red first, then Yellow, then Green.
+          The queue updates whenever the rules below change.
+        </p>
+
+        <div class="pq-summary" id="pqSummary"></div>
+        <div class="pq-filters" id="pqFilters"></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Priority</th>
+                <th>Application</th>
+                <th>Student</th>
+                <th>Scheme</th>
+                <th>Marks / Income</th>
+                <th>Risk</th>
+                <th>AI Findings</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="pqBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DYNAMIC RULE ENGINE -->
+      <div class="panel" id="ruleEnginePanel">
+        <span class="eyebrow">DYNAMIC RULE ENGINE</span>
+        <h2>Eligibility Rules (Live Configuration)</h2>
+        <p class="muted">
+          Change a parameter and save. All pending applications (Submitted, Under
+          Review, Deficient) are re-evaluated instantly. Approved ones are never touched.
+        </p>
+
+        <div id="ruleEngineForm" class="rule-grid"></div>
+
+        <div class="rule-actions">
+          <button type="button" class="secondary-btn" onclick="previewRuleImpact()">👁 Preview Impact</button>
+          <button type="button" class="primary-btn" onclick="saveRulesAndReevaluate()">⚡ Save &amp; Re-evaluate All</button>
+          <button type="button" class="text-btn" onclick="resetRulesToDefault()">Reset to defaults</button>
+        </div>
+
+        <div id="ruleEngineResult" aria-live="polite"></div>
+      </div>
+
       <div class="panel">
         <div class="table-heading">
           <h2>Submitted Applications</h2>
@@ -609,7 +660,67 @@
       </button>
     </div>
   </div>
-   
+  <!-- =====================================================
+       PHASE 4: TWO-WAY COMMUNICATION & RE-UPLOAD HUB MODAL
+       ===================================================== -->
+  <div id="commHubModal" class="modal hidden">
+    <div class="modal-box comm-hub-box">
+      <div class="comm-hub-header">
+        <div>
+          <span class="eyebrow">PHASE 4 · TWO-WAY COMMUNICATION HUB</span>
+          <h3 id="commHubTitle">Application Ticket #TS260001</h3>
+          <p id="commHubMeta" class="muted small">Loading ticket details...</p>
+        </div>
+        <button type="button" class="auth-close" onclick="closeCommHub()">×</button>
+      </div>
+
+      <!-- Officer Quick Query Templates (Visible for Officer / Demo) -->
+      <div id="officerQuickQueries" class="comm-quick-bar">
+        <span class="small muted">⚡ Quick Ministry Queries:</span>
+        <button type="button" class="comm-chip" onclick="sendQuickOfficerQuery('Your Income Certificate appears expired. Please re-upload a current financial year certificate below.')">
+          Expired Income Cert
+        </button>
+        <button type="button" class="comm-chip" onclick="sendQuickOfficerQuery('Name spelling on your Marksheet does not match the application form. Please clarify or upload a corrected copy.')">
+          Name Mismatch
+        </button>
+        <button type="button" class="comm-chip" onclick="sendQuickOfficerQuery('Please upload a clearer scan of your ST Certificate for verification.')">
+          Unclear ST Cert
+        </button>
+      </div>
+
+      <!-- Ticket Conversation Thread -->
+      <div id="commHubMessages" class="comm-messages-list"></div>
+
+      <!-- Two-Way Reply Form -->
+      <form id="commReplyForm" class="comm-reply-form" onsubmit="handleTicketReply(event)">
+        <input
+          id="commReplyInput"
+          type="text"
+          placeholder="Write a reply or query on this application ticket..."
+          required
+        >
+        <button type="submit" class="primary-btn">Send Reply</button>
+      </form>
+
+      <!-- Direct Deficient Document Re-Upload Section -->
+      <div class="comm-reupload-panel">
+        <h4>📎 Re-Upload Deficient Document Directly</h4>
+        <p class="muted small">
+          Upload the corrected document under this ticket. Status will automatically update to <strong>Under Review</strong>.
+        </p>
+        <form id="commReuploadForm" class="comm-reupload-row" onsubmit="handleTicketReupload(event)">
+          <select id="reuploadDocType" required>
+            <option value="Income Certificate">Income Certificate</option>
+            <option value="ST Certificate">ST Certificate</option>
+            <option value="Marksheet">Marksheet / Academic Record</option>
+            <option value="University Offer Letter">University Offer Letter</option>
+          </select>
+          <input id="reuploadDocFile" type="file" accept=".pdf,.png,.jpg,.jpeg" required>
+          <button type="submit" class="secondary-btn">Upload &amp; Resolve</button>
+        </form>
+      </div>
+    </div>
+  </div>
   <footer>
     <p>TribalScholar · PS 239 Prototype · For demonstration only</p>
   </footer>
