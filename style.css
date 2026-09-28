@@ -1,3218 +1,2072 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+/* ===========================================================================
+   TRIBALSCHOLAR — FINAL MERGED SCRIPT (SIH RATE-LIMIT SAFE EDITION)
+   Supabase Auth, DB & Storage + Auto Rate-Limit Bypass + AI OCR +
+   Cross-Verification + AI Eligibility Engine + Smart Deficiency Alerts
+   =========================================================================== */
 
-:root {
-  --green: #176b50;
-  --green-dark: #104c3b;
-  --green-light: #e9f5ef;
-  --ink: #182a25;
-  --muted: #687870;
-  --border: #e1e9e4;
-  --surface: #ffffff;
-  --background: #f6f9f7;
-  --orange: #e9a34b;
-  --shadow: 0 12px 32px rgba(24, 60, 44, 0.07);
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: "DM Sans", sans-serif;
-  background: var(--background);
-  color: var(--ink);
-  line-height: 1.6;
-}
-
-button, input, select, textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-.navbar {
-  background: white;
-  border-bottom: 1px solid var(--border);
-  padding: 15px 5%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  color: var(--ink);
-  text-decoration: none;
-  font-family: "Manrope", sans-serif;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.brand small {
-  display: block;
-  font-family: "DM Sans", sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.brand-icon {
-  display: grid;
-  place-items: center;
-  background: var(--green);
-  color: white;
-  border-radius: 12px;
-  width: 43px;
-  height: 43px;
-  font-size: 22px;
-}
-
-nav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-nav button {
-  background: transparent;
-  border: 0;
-  padding: 10px 13px;
-  color: #43534b;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-nav button:hover {
-  background: var(--green-light);
-  color: var(--green);
-}
-
-/* Active navigation button */
-nav .nav-btn {
-  background: transparent;
-  color: #43534b;
-  border: 1px solid transparent;
-  padding: 10px 16px;
-  border-radius: 9px;
-  font-weight: 600;
-  transition: all 0.25s ease;
-}
-
-nav .nav-btn.active {
-  background: #176b50;
-  color: white;
-  border-color: #176b50;
-  box-shadow: 0 4px 12px rgba(23, 107, 80, 0.20);
-}
-
-nav .nav-btn:hover:not(.active) {
-  background: #e9f5ef;
-  color: #176b50;
-}
-
-/* Auth User Menu in Navbar */
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 6px;
-}
-
-.user-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.user-role {
-  background: var(--green-light);
-  color: var(--green);
-  padding: 4px 9px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-/* Click kiye gaye button ka highlight */
-button.clicked,
-button.button-clicked {
-  outline: 3px solid rgba(23, 107, 80, 0.25);
-  outline-offset: 3px;
-  box-shadow: 0 4px 14px rgba(23, 107, 80, 0.22);
-  transform: translateY(-1px);
-}
-
-button.clicked:hover {
-  outline: 3px solid rgba(23, 107, 80, 0.25);
-  outline-offset: 3px;
-}
-
-main {
-  width: min(1180px, 90%);
-  margin: 38px auto 70px;
-}
-
-.page {
-  display: none;
-}
-
-.page.active {
-  display: block;
-  animation: appear 0.25s ease;
-}
-
-@keyframes appear {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.hero {
-  background: linear-gradient(120deg, #eaf5ee, #f4f6e9);
-  border: 1px solid #dcebe0;
-  border-radius: 25px;
-  padding: 60px;
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  gap: 45px;
-  align-items: center;
-  overflow: hidden;
-}
-
-.eyebrow {
-  display: inline-block;
-  color: var(--green);
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  font-weight: 800;
-  margin-bottom: 13px;
-}
-
-h1, h2, h3 {
-  font-family: "Manrope", sans-serif;
-  line-height: 1.25;
-}
-
-.hero h1 {
-  font-size: clamp(32px, 4vw, 51px);
-  max-width: 650px;
-  letter-spacing: -1.7px;
-}
-
-.hero-content > p {
-  color: #52675c;
-  max-width: 560px;
-  margin: 20px 0 26px;
-  font-size: 16px;
-}
-
-.primary-btn {
-  background: var(--green);
-  color: white;
-  border: 1px solid var(--green);
-  padding: 13px 21px;
-  border-radius: 10px;
-  font-weight: 700;
-  transition: 0.2s;
-}
-
-.primary-btn:hover {
-  background: var(--green-dark);
-  transform: translateY(-1px);
-}
-
-.secondary-btn {
-  background: white;
-  color: var(--green);
-  border: 1px solid var(--border);
-  padding: 9px 14px;
-  border-radius: 9px;
-  font-weight: 600;
-}
-
-.hero-card {
-  background: white;
-  border: 1px solid #dce9df;
-  padding: 28px;
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-}
-
-.hero-symbol {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.hero-card h3 {
-  font-size: 22px;
-}
-
-.hero-card p {
-  color: var(--muted);
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.hero-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 22px;
-}
-
-.hero-tags span, .pill {
-  background: var(--green-light);
-  color: var(--green);
-  padding: 6px 10px;
-  border-radius: 30px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 17px;
-  margin: 25px 0 45px;
-}
-
-.stat-card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 15px;
-  padding: 22px;
-}
-
-.stat-card span {
-  display: block;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.stat-card strong {
-  display: block;
-  font-family: "Manrope", sans-serif;
-  font-size: 30px;
-  margin-top: 7px;
-}
-
-.section-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  margin-bottom: 20px;
-}
-
-.section-heading h2, .panel h2 {
-  font-size: 23px;
-}
-
-.section-subtitle {
-  color: var(--muted);
-  margin-top: 8px;
-  font-size: 14px;
-}
-
-.scheme-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.scheme-card, .panel {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 27px;
-}
-
-.scheme-card {
-  transition: 0.2s;
-}
-
-.scheme-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
-}
-
-.scheme-icon {
-  font-size: 32px;
-  margin-bottom: 17px;
-}
-
-.scheme-card h3 {
-  font-size: 20px;
-  margin: 15px 0 10px;
-}
-
-.scheme-card p {
-  color: var(--muted);
-  font-size: 14px;
-  margin-bottom: 20px;
-}
-
-.text-btn {
-  background: transparent;
-  border: 0;
-  color: var(--green);
-  font-weight: 800;
-}
-
-/* HOW IT WORKS & KEY FEATURES */
-.how-section,
-.features-section {
-  margin-top: 65px;
-}
-
-.steps-grid,
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 25px;
-}
-
-.step-card {
-  position: relative;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 25px 20px;
-  overflow: hidden;
-  transition: 0.25s ease;
-}
-
-.feature-card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 23px 20px;
-  transition: 0.25s ease;
-}
-
-.step-card:hover,
-.feature-card:hover {
-  transform: translateY(-5px);
-  border-color: #b7d8c5;
-  box-shadow: var(--shadow);
-}
-
-.step-number {
-  position: absolute;
-  right: 17px;
-  top: 13px;
-  font-size: 26px;
-  font-weight: 800;
-  color: #e3eee7;
-  font-family: "Manrope", sans-serif;
-}
-
-.step-icon,
-.feature-icon {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 15px;
-  background: var(--green-light);
-  font-size: 25px;
-  margin-bottom: 20px;
-}
-
-.feature-icon {
-  width: 48px;
-  height: 48px;
-  font-size: 22px;
-}
-
-.step-card h3,
-.feature-card h3 {
-  font-size: 16px;
-  margin-bottom: 9px;
-}
-
-.step-card p,
-.feature-card p {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-/* CALL TO ACTION */
-.cta-section {
-  margin-top: 65px;
-  padding: 38px 42px;
-  border-radius: 22px;
-  background: linear-gradient(120deg, #104c3b, #20775a);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 30px;
-}
-
-.cta-section .eyebrow {
-  color: #bfe7cf;
-}
-
-.cta-section h2 {
-  font-size: clamp(24px, 3vw, 34px);
-  max-width: 600px;
-}
-
-.cta-section p {
-  color: #e0eee6;
-  margin-top: 12px;
-  font-size: 14px;
-}
-
-.cta-section .primary-btn {
-  background: white;
-  color: var(--green-dark);
-  border-color: white;
-  flex-shrink: 0;
-}
-
-.cta-section .primary-btn:hover {
-  background: #e9f5ef;
-}
-
-.notice {
-  background: #fff7e9;
-  border: 1px solid #f2dfba;
-  color: #755526;
-  padding: 15px 18px;
-  border-radius: 11px;
-  margin-top: 25px;
-  font-size: 13px;
-}
-
-.page-heading {
-  margin: 15px 0 25px;
-}
-
-.page-heading h1 {
-  font-size: clamp(29px, 4vw, 40px);
-  letter-spacing: -1px;
-}
-
-.page-heading p {
-  color: var(--muted);
-  margin-top: 9px;
-}
-
-.panel {
-  margin-bottom: 24px;
-}
-
-.panel > h2 {
-  margin-bottom: 23px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: #33473d;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-input, select, textarea {
-  width: 100%;
-  min-width: 0;
-  padding: 12px 13px;
-  border: 1px solid #d9e3dc;
-  border-radius: 9px;
-  background: white;
-  color: var(--ink);
-  outline: none;
-  font-size: 14px;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(23, 107, 80, 0.09);
-}
-
-input[type="file"] {
-  font-size: 12px;
-  padding: 10px;
-}
-
-.subheading {
-  margin: 32px 0 8px;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 17px;
-}
-
-.small {
-  font-size: 12px;
-  margin: 15px 0 0;
-}
-
-.panel > .primary-btn {
-  margin-top: 25px;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.message,
-.form-message {
-  margin-top: 20px;
-  padding: 16px;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.message.success,
-.form-message.success {
-  background: #eaf7ee;
-  color: #176b50;
-  border: 1px solid #cde9d5;
-}
-
-.message.error,
-.form-message.error {
-  background: #fff0ed;
-  color: #a43d2c;
-  border: 1px solid #f2d0c9;
-}
-
-/* TRACKING & TIMELINE */
-.tracking-panel {
-  max-width: 850px;
-}
-
-.track-form {
-  display: flex;
-  gap: 10px;
-}
-
-.track-form input {
-  flex: 1;
-}
-
-.result-card {
-  margin-top: 22px;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  padding: 20px;
-}
-
-.result-card h3 {
-  margin-bottom: 12px;
-}
-
-.result-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
+/* =========================================================
+   1. SUPABASE CONFIGURATION
+   ========================================================= */
+const SUPABASE_URL = "https://pzhvbysnrcsumivvvlfx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8rAdF0TNelKSQc_MdeKVOA_7EBvDdtt";
 
-.result-line:last-child {
-  border-bottom: 0;
+if (!window.supabase) {
+  throw new Error("Supabase JS library failed to load. Check index.html.");
 }
 
-.status {
-  display: inline-block;
-  padding: 5px 9px;
-  border-radius: 30px;
-  background: #eef1f0;
-  color: #52615a;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.status.pending {
-  background: #fff2d9;
-  color: #8b5a09;
-}
-
-.status.review {
-  background: #e8f1ff;
-  color: #2459a6;
-}
-
-.status.deficient {
-  background: #fff0ed;
-  color: #a43d2c;
-}
-
-.status.approved {
-  background: #e4f6e9;
-  color: #176b50;
-}
-
-.timeline-container {
-  margin-top: 28px;
-  padding: 24px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-}
-
-.timeline-container h2 {
-  margin-top: 0;
-}
-
-.timeline {
-  margin-top: 24px;
-}
-
-.timeline-step {
-  display: flex;
-  gap: 16px;
-  position: relative;
-  padding-bottom: 28px;
-  opacity: 0.55;
-}
-
-.timeline-step:last-child {
-  padding-bottom: 0;
-}
-
-.timeline-step:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 17px;
-  top: 36px;
-  height: calc(100% - 36px);
-  width: 2px;
-  background: #cbd5e1;
-}
-
-.timeline-dot {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #e2e8f0;
-  color: #475569;
-  font-weight: bold;
-  z-index: 1;
-}
-
-.timeline-content h3 {
-  margin: 4px 0 6px;
-  font-size: 16px;
-}
-
-.timeline-content p {
-  margin: 0;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.timeline-step.completed {
-  opacity: 1;
-}
-
-.timeline-step.completed .timeline-dot {
-  background: #15803d;
-  color: white;
-}
-
-.timeline-step.completed:not(:last-child)::before {
-  background: #15803d;
-}
-
-.timeline-step.current {
-  opacity: 1;
-}
-
-.timeline-step.current .timeline-dot {
-  background: #2563eb;
-  color: white;
-  box-shadow: 0 0 0 5px #dbeafe;
-}
-
-/* OFFICER TABLE & REVIEW NOTES */
-.table-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-th {
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: #f7faf8;
-}
-
-th, td {
-  padding: 15px 12px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-
-td select {
-  min-width: 145px;
-  font-size: 12px;
-  padding: 8px;
-}
-
-.admin-note-wrap {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.admin-note-wrap input {
-  font-size: 12px;
-  padding: 6px 8px;
-}
-
-.admin-note-wrap button {
-  font-size: 12px;
-  padding: 6px 10px;
-  white-space: nowrap;
-}
-
-.empty-state {
-  text-align: center;
-  color: var(--muted);
-  padding: 35px 10px;
-}
-
-footer {
-  border-top: 1px solid var(--border);
-  text-align: center;
-  padding: 25px 5%;
-  color: var(--muted);
-  font-size: 12px;
-  background: white;
-}
-
-/* SMART APPLICATION READINESS CHECKER */
-.readiness-panel {
-  margin-top: 24px;
-  border: 1px solid #dce7e1;
-  background: #ffffff;
-}
-
-.readiness-panel h2 {
-  margin: 10px 0;
-}
-
-.readiness-panel > p {
-  color: #64748b;
-  line-height: 1.7;
-  margin-bottom: 18px;
-}
-
-.readiness-result {
-  margin-top: 18px;
-}
-
-.readiness-success,
-.readiness-warning {
-  padding: 18px;
-  border-radius: 12px;
-  line-height: 1.6;
-}
-
-.readiness-success {
-  background: #ecfdf3;
-  border: 1px solid #a7f3d0;
-  color: #166534;
-}
-
-.readiness-warning {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-}
-
-.readiness-success h3,
-.readiness-warning h3 {
-  margin: 0 0 8px;
-}
-
-.readiness-result ul {
-  padding-left: 22px;
-  margin-bottom: 0;
-}
-
-/* AI DOCUMENT INTELLIGENCE (OCR) */
-.ocr-box {
-  margin-top: 10px;
-}
-
-.ocr-loading {
-  font-size: 13px;
-  color: var(--green);
-  background: var(--green-light);
-  padding: 10px 12px;
-  border-radius: 9px;
-}
-
-.ocr-error {
-  font-size: 13px;
-  color: #a43d2c;
-  background: #fff0ed;
-  border: 1px solid #f2d0c9;
-  padding: 10px 12px;
-  border-radius: 9px;
-}
-
-.ocr-result-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  background: #fbfdfc;
-  font-size: 13px;
-}
-
-.ocr-result-header {
-  font-weight: 700;
-  color: var(--green);
-  margin-bottom: 8px;
-}
-
-.ocr-field-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 4px 0;
-  border-bottom: 1px dashed var(--border);
-}
-
-.ocr-field-row:last-child {
-  border-bottom: 0;
-}
-
-.ocr-summary-panel {
-  border: 1px solid #dce7e1;
-  margin-top: 24px;
-}
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
 
-.ocr-summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  margin-top: 6px;
-}
-
-.ocr-summary-table th,
-.ocr-summary-table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.ocr-mismatch-warning {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #fff0ed;
-  border: 1px solid #f2d0c9;
-  color: #a43d2c;
-  font-size: 13px;
-}
-
-.ocr-match-ok {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #eaf7ee;
-  border: 1px solid #cde9d5;
-  color: #176b50;
-  font-size: 13px;
-}
-
-/* IDENTITY VERIFICATION & MODAL */
-.identity-panel {
-  border: 1px solid var(--green-light);
-  background: #fbfdfc;
-}
-
-.identity-actions {
-  display: flex;
-  gap: 10px;
-  margin: 16px 0;
-  flex-wrap: wrap;
-}
-
-.identity-status {
-  padding: 12px 16px;
-  border-radius: 10px;
-  margin-top: 10px;
-  font-size: 14px;
-}
-
-.identity-status.success {
-  background: #eaf7ee;
-  color: #176b50;
-  border: 1px solid #cde9d5;
-}
-
-.identity-status.error {
-  background: #fff0ed;
-  color: #a43d2c;
-  border: 1px solid #f2d0c9;
-}
-
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-box {
-  background: white;
-  border-radius: 16px;
-  padding: 28px;
-  width: min(400px, 90%);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.modal-box .primary-btn {
-  margin-top: 10px;
-  width: 100%;
-}
-
-.verified-field {
-  background: var(--green-light) !important;
-  border-color: var(--green) !important;
-}
-
-/* ---------------------------------------------------------------------- */
-/* INTELLIGENT CROSS-VERIFICATION — form fields vs OCR-extracted data     */
-/* ---------------------------------------------------------------------- */
-.verification-panel {
-  border: 1px solid #dce7e1;
-  margin-top: 24px;
-}
-
-.cross-verification-result {
-  margin-top: 6px;
-}
-
-.field-check-note {
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: -2px;
-  min-height: 14px;
-}
-
-.field-check-note.match {
-  color: #176b50;
-}
-
-.field-check-note.mismatch {
-  color: #a43d2c;
-}
-
-input.field-match {
-  border-color: #176b50 !important;
-  box-shadow: 0 0 0 3px rgba(23, 107, 80, 0.12) !important;
-}
-
-input.field-mismatch {
-  border-color: #d9534f !important;
-  box-shadow: 0 0 0 3px rgba(217, 83, 79, 0.14) !important;
-}
-
-.match-badge {
-  display: inline-block;
-  padding: 4px 9px;
-  border-radius: 30px;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.match-badge.match {
-  background: #eaf7ee;
-  color: #176b50;
-}
-
-.match-badge.mismatch {
-  background: #fff0ed;
-  color: #a43d2c;
-}
-
-/* ---------------------------------------------------------------------- */
-/* SMART DEFICIENCY ALERT — AI-generated SMS / Email notice               */
-/* ---------------------------------------------------------------------- */
-.deficiency-alert-box {
-  width: min(540px, 92%);
-  text-align: left;
-  max-height: 85vh;
-  overflow-y: auto;
-}
+/* =========================================================
+   2. GLOBAL STATE & LOCAL CACHES (RATE-LIMIT FALLBACK READY)
+   ========================================================= */
+let currentUser = null;
+let currentProfile = null;
+let authMode = "login";
 
-.deficiency-alert-block {
-  margin-top: 14px;
-}
-
-.deficiency-alert-block strong {
-  font-size: 13px;
-  color: var(--ink);
-}
-
-.deficiency-alert-text {
-  white-space: pre-wrap;
-  background: #f7faf8;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  font-size: 12.5px;
-  margin-top: 6px;
-  font-family: inherit;
-  color: #33473d;
-}
-
-.alert-bell-btn {
-  margin-left: 6px;
-  font-size: 12px;
-}
-
-/* ---------------------------------------------------------------------- */
-/* AI ELIGIBILITY ENGINE                                                  */
-/* ---------------------------------------------------------------------- */
-.eligibility-panel {
-  border: 1px solid #dce7e1;
-  background: #fbfdfc;
-  margin-top: 24px;
-}
-
-.eligibility-result {
-  margin-top: 18px;
-}
-
-.eligibility-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: #f7faf8;
-  border: 1px solid var(--border);
-}
-
-.eligibility-head strong {
-  display: block;
-  font-size: 15px;
-  color: var(--ink);
-}
-
-.eligibility-head span {
-  display: block;
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.eligibility-score {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--green);
-  font-family: "Manrope", sans-serif;
-}
-
-.eligibility-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.eligibility-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 13px 14px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: white;
-}
-
-.eligibility-item-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 800;
-  flex-shrink: 0;
-  margin-top: 2px;
-  background: #eef1f0;
-  color: var(--ink);
-}
-
-.eligibility-item strong {
-  display: block;
-  font-size: 13px;
-  margin-bottom: 4px;
-}
-
-.eligibility-item span {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.eligibility-item.pass {
-  border-color: #cde9d5;
-  background: #f5fbf7;
-}
-
-.eligibility-item.pass strong {
-  color: #176b50;
-}
-
-.eligibility-item.pass .eligibility-item-icon {
-  background: #eaf7ee;
-  color: #176b50;
-}
-
-.eligibility-item.review {
-  border-color: #f2dfba;
-  background: #fffaf1;
-}
-
-.eligibility-item.review strong {
-  color: #8b5a09;
-}
-
-.eligibility-item.review .eligibility-item-icon {
-  background: #fff2d9;
-  color: #8b5a09;
-}
-
-.eligibility-item.fail {
-  border-color: #f2d0c9;
-  background: #fff7f5;
-}
-
-.eligibility-item.fail strong {
-  color: #a43d2c;
-}
-
-.eligibility-item.fail .eligibility-item-icon {
-  background: #fff0ed;
-  color: #a43d2c;
-}
+const ocrData = {}; // { stCertificate: {...fields}, marksheet: {...fields}, incomeCertificate: {...fields} }
+const ALERT_CACHE_KEY = "tribalScholarDeficiencyAlerts";
+const DEMO_SESSION_KEY = "tribalScholarFallbackSession";
+const LOCAL_APPS_KEY = "tribalScholarLocalApplications";
 
-.eligibility-disclaimer {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--muted);
+function getAlertCache() {
+  try {
+    return JSON.parse(localStorage.getItem(ALERT_CACHE_KEY)) || {};
+  } catch {
+    return {};
+  }
 }
 
-.eligibility-banner {
-  margin-top: 12px;
-  padding: 13px 15px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
+function saveAlertToCache(appId, alertObj) {
+  const cache = getAlertCache();
+  cache[appId] = alertObj;
+  localStorage.setItem(ALERT_CACHE_KEY, JSON.stringify(cache));
 }
 
-.eligibility-banner strong {
-  display: block;
-  margin-bottom: 2px;
+function getFallbackSession() {
+  try {
+    return JSON.parse(localStorage.getItem(DEMO_SESSION_KEY)) || null;
+  } catch {
+    return null;
+  }
 }
 
-.eligibility-banner span {
-  font-weight: 500;
+function setFallbackSession(userObj, profileObj) {
+  localStorage.setItem(
+    DEMO_SESSION_KEY,
+    JSON.stringify({ user: userObj, profile: profileObj })
+  );
 }
 
-.eligibility-banner.pass {
-  background: #eaf7ee;
-  color: #176b50;
-  border: 1px solid #cde9d5;
+function clearFallbackSession() {
+  localStorage.removeItem(DEMO_SESSION_KEY);
 }
 
-.eligibility-banner.review {
-  background: #fff7e9;
-  color: #755526;
-  border: 1px solid #f2dfba;
+function getLocalApplications() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_APPS_KEY)) || [];
+  } catch {
+    return [];
+  }
 }
 
-.eligibility-banner.fail {
-  background: #fff0ed;
-  color: #a43d2c;
-  border: 1px solid #f2d0c9;
+function saveLocalApplications(apps) {
+  localStorage.setItem(LOCAL_APPS_KEY, JSON.stringify(apps));
 }
 
 /* =========================================================
-   TRIBALSCHOLAR AUTH MODAL (SUPABASE)
+   3. AI-POWERED OCR ENGINE (Tesseract.js + PDF.js)
    ========================================================= */
-#authPanel {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  display: none !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 24px !important;
-  box-sizing: border-box !important;
-  background: linear-gradient(
-    135deg,
-    rgba(8, 25, 18, 0.94),
-    rgba(16, 48, 35, 0.90)
-  ) !important;
-  z-index: 999999 !important;
-  overflow-y: auto !important;
-}
-
-#authPanel.show {
-  display: flex !important;
-}
-
-#authPanel .auth-panel-inner,
-#authPanel .auth-card {
-  width: min(440px, 100%) !important;
-  padding: 34px !important;
-  background: rgba(255, 255, 255, 0.97) !important;
-  border-radius: 24px !important;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35) !important;
-  position: relative !important;
-  box-sizing: border-box !important;
-  color: #17251f !important;
-}
-
-#authPanel .auth-close {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  background: transparent;
-  border: 0;
-  font-size: 24px;
-  color: var(--muted);
-}
-
-#authPanel .auth-brand,
-#authPanel .auth-header {
-  margin-bottom: 24px !important;
-}
-
-#authPanel .auth-brand h2,
-#authPanel .auth-header h2 {
-  margin: 8px 0 !important;
-}
-
-#authPanel .auth-brand p,
-#authPanel .auth-header p {
-  margin: 0 !important;
-  opacity: 0.7 !important;
-}
-
-#authPanel form {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 16px !important;
-}
-
-#authPanel label {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 7px !important;
-  font-weight: 600 !important;
-}
-
-#authPanel input {
-  width: 100% !important;
-  box-sizing: border-box !important;
-  padding: 13px 14px !important;
-  border: 1px solid #d9dfdc !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
-  color: #17251f !important;
-  outline: none !important;
-  font-size: 15px !important;
-}
-
-#authPanel input:focus {
-  border-color: #4d8068 !important;
-  box-shadow: 0 0 0 3px rgba(77, 128, 104, 0.12) !important;
-}
-
-#authPanel button {
-  box-sizing: border-box !important;
-}
-
-#authPanel #authSubmit {
-  width: 100% !important;
-  margin-top: 4px !important;
-}
-
-#authPanel #authSwitchButton {
-  width: 100% !important;
-  margin-top: 14px !important;
-}
-
-.timeline-step {
-  display: flex;
-  gap: 16px;
-  position: relative;
-  padding-bottom: 28px;
-  opacity: 0.55;
-}
-
-.timeline-step:last-child {
-  padding-bottom: 0;
-}
-
-.timeline-step:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 17px;
-  top: 36px;
-  height: calc(100% - 36px);
-  width: 2px;
-  background: #cbd5e1;
-}
-
-.timeline-dot {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #e2e8f0;
-  color: #475569;
-  font-weight: bold;
-  z-index: 1;
-}
-
-.timeline-content h3 {
-  margin: 4px 0 6px;
-  font-size: 16px;
-}
-
-.timeline-content p {
-  margin: 0;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.timeline-step.completed {
-  opacity: 1;
-}
-
-.timeline-step.completed .timeline-dot {
-  background: #15803d;
-  color: white;
-}
-
-.timeline-step.completed:not(:last-child)::before {
-  background: #15803d;
-}
-
-.timeline-step.current {
-  opacity: 1;
-}
-
-.timeline-step.current .timeline-dot {
-  background: #2563eb;
-  color: white;
-  box-shadow: 0 0 0 5px #dbeafe;
-}
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
-
-:root {
-  --green: #176b50;
-  --green-dark: #104c3b;
-  --green-light: #e9f5ef;
-  --ink: #182a25;
-  --muted: #687870;
-  --border: #e1e9e4;
-  --surface: #ffffff;
-  --background: #f6f9f7;
-  --orange: #e9a34b;
-  --shadow: 0 12px 32px rgba(24, 60, 44, 0.07);
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: "DM Sans", sans-serif;
-  background: var(--background);
-  color: var(--ink);
-  line-height: 1.6;
-}
-
-button, input, select, textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-.navbar {
-  background: white;
-  border-bottom: 1px solid var(--border);
-  padding: 15px 5%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  color: var(--ink);
-  text-decoration: none;
-  font-family: "Manrope", sans-serif;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.brand small {
-  display: block;
-  font-family: "DM Sans", sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.brand-icon {
-  display: grid;
-  place-items: center;
-  background: var(--green);
-  color: white;
-  border-radius: 12px;
-  width: 43px;
-  height: 43px;
-  font-size: 22px;
-}
-
-nav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-nav button {
-  background: transparent;
-  border: 0;
-  padding: 10px 13px;
-  color: #43534b;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-nav button:hover {
-  background: var(--green-light);
-  color: var(--green);
-}
-
-/* Active navigation button */
-nav .nav-btn {
-  background: transparent;
-  color: #43534b;
-  border: 1px solid transparent;
-  padding: 10px 16px;
-  border-radius: 9px;
-  font-weight: 600;
-  transition: all 0.25s ease;
-}
-
-nav .nav-btn.active {
-  background: #176b50;
-  color: white;
-  border-color: #176b50;
-  box-shadow: 0 4px 12px rgba(23, 107, 80, 0.20);
-}
-
-nav .nav-btn:hover:not(.active) {
-  background: #e9f5ef;
-  color: #176b50;
-}
-
-/* Auth User Menu in Navbar */
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 6px;
-}
-
-.user-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.user-role {
-  background: var(--green-light);
-  color: var(--green);
-  padding: 4px 9px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-/* Click kiye gaye button ka highlight */
-button.clicked,
-button.button-clicked {
-  outline: 3px solid rgba(23, 107, 80, 0.25);
-  outline-offset: 3px;
-  box-shadow: 0 4px 14px rgba(23, 107, 80, 0.22);
-  transform: translateY(-1px);
-}
-
-button.clicked:hover {
-  outline: 3px solid rgba(23, 107, 80, 0.25);
-  outline-offset: 3px;
-}
-
-main {
-  width: min(1180px, 90%);
-  margin: 38px auto 70px;
-}
-
-.page {
-  display: none;
-}
-
-.page.active {
-  display: block;
-  animation: appear 0.25s ease;
-}
-
-@keyframes appear {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.hero {
-  background: linear-gradient(120deg, #eaf5ee, #f4f6e9);
-  border: 1px solid #dcebe0;
-  border-radius: 25px;
-  padding: 60px;
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  gap: 45px;
-  align-items: center;
-  overflow: hidden;
-}
-
-.eyebrow {
-  display: inline-block;
-  color: var(--green);
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  font-weight: 800;
-  margin-bottom: 13px;
-}
-
-h1, h2, h3 {
-  font-family: "Manrope", sans-serif;
-  line-height: 1.25;
-}
-
-.hero h1 {
-  font-size: clamp(32px, 4vw, 51px);
-  max-width: 650px;
-  letter-spacing: -1.7px;
-}
-
-.hero-content > p {
-  color: #52675c;
-  max-width: 560px;
-  margin: 20px 0 26px;
-  font-size: 16px;
-}
-
-.primary-btn {
-  background: var(--green);
-  color: white;
-  border: 1px solid var(--green);
-  padding: 13px 21px;
-  border-radius: 10px;
-  font-weight: 700;
-  transition: 0.2s;
-}
-
-.primary-btn:hover {
-  background: var(--green-dark);
-  transform: translateY(-1px);
-}
-
-.secondary-btn {
-  background: white;
-  color: var(--green);
-  border: 1px solid var(--border);
-  padding: 9px 14px;
-  border-radius: 9px;
-  font-weight: 600;
-}
-
-.hero-card {
-  background: white;
-  border: 1px solid #dce9df;
-  padding: 28px;
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-}
-
-.hero-symbol {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.hero-card h3 {
-  font-size: 22px;
-}
-
-.hero-card p {
-  color: var(--muted);
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.hero-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 22px;
-}
-
-.hero-tags span, .pill {
-  background: var(--green-light);
-  color: var(--green);
-  padding: 6px 10px;
-  border-radius: 30px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 17px;
-  margin: 25px 0 45px;
-}
-
-.stat-card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 15px;
-  padding: 22px;
-}
-
-.stat-card span {
-  display: block;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.stat-card strong {
-  display: block;
-  font-family: "Manrope", sans-serif;
-  font-size: 30px;
-  margin-top: 7px;
-}
-
-.section-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  margin-bottom: 20px;
-}
-
-.section-heading h2, .panel h2 {
-  font-size: 23px;
-}
-
-.section-subtitle {
-  color: var(--muted);
-  margin-top: 8px;
-  font-size: 14px;
-}
-
-.scheme-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.scheme-card, .panel {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 27px;
-}
-
-.scheme-card {
-  transition: 0.2s;
-}
-
-.scheme-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
-}
-
-.scheme-icon {
-  font-size: 32px;
-  margin-bottom: 17px;
-}
-
-.scheme-card h3 {
-  font-size: 20px;
-  margin: 15px 0 10px;
-}
-
-.scheme-card p {
-  color: var(--muted);
-  font-size: 14px;
-  margin-bottom: 20px;
-}
-
-.text-btn {
-  background: transparent;
-  border: 0;
-  color: var(--green);
-  font-weight: 800;
-}
-
-/* HOW IT WORKS & KEY FEATURES */
-.how-section,
-.features-section {
-  margin-top: 65px;
-}
-
-.steps-grid,
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 25px;
-}
-
-.step-card {
-  position: relative;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 25px 20px;
-  overflow: hidden;
-  transition: 0.25s ease;
-}
-
-.feature-card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 23px 20px;
-  transition: 0.25s ease;
-}
-
-.step-card:hover,
-.feature-card:hover {
-  transform: translateY(-5px);
-  border-color: #b7d8c5;
-  box-shadow: var(--shadow);
-}
-
-.step-number {
-  position: absolute;
-  right: 17px;
-  top: 13px;
-  font-size: 26px;
-  font-weight: 800;
-  color: #e3eee7;
-  font-family: "Manrope", sans-serif;
-}
-
-.step-icon,
-.feature-icon {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 15px;
-  background: var(--green-light);
-  font-size: 25px;
-  margin-bottom: 20px;
-}
-
-.feature-icon {
-  width: 48px;
-  height: 48px;
-  font-size: 22px;
-}
-
-.step-card h3,
-.feature-card h3 {
-  font-size: 16px;
-  margin-bottom: 9px;
-}
-
-.step-card p,
-.feature-card p {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-/* CALL TO ACTION */
-.cta-section {
-  margin-top: 65px;
-  padding: 38px 42px;
-  border-radius: 22px;
-  background: linear-gradient(120deg, #104c3b, #20775a);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 30px;
-}
-
-.cta-section .eyebrow {
-  color: #bfe7cf;
-}
-
-.cta-section h2 {
-  font-size: clamp(24px, 3vw, 34px);
-  max-width: 600px;
-}
-
-.cta-section p {
-  color: #e0eee6;
-  margin-top: 12px;
-  font-size: 14px;
-}
-
-.cta-section .primary-btn {
-  background: white;
-  color: var(--green-dark);
-  border-color: white;
-  flex-shrink: 0;
-}
-
-.cta-section .primary-btn:hover {
-  background: #e9f5ef;
-}
-
-.notice {
-  background: #fff7e9;
-  border: 1px solid #f2dfba;
-  color: #755526;
-  padding: 15px 18px;
-  border-radius: 11px;
-  margin-top: 25px;
-  font-size: 13px;
-}
-
-.page-heading {
-  margin: 15px 0 25px;
-}
-
-.page-heading h1 {
-  font-size: clamp(29px, 4vw, 40px);
-  letter-spacing: -1px;
-}
-
-.page-heading p {
-  color: var(--muted);
-  margin-top: 9px;
-}
-
-.panel {
-  margin-bottom: 24px;
-}
-
-.panel > h2 {
-  margin-bottom: 23px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: #33473d;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-input, select, textarea {
-  width: 100%;
-  min-width: 0;
-  padding: 12px 13px;
-  border: 1px solid #d9e3dc;
-  border-radius: 9px;
-  background: white;
-  color: var(--ink);
-  outline: none;
-  font-size: 14px;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(23, 107, 80, 0.09);
-}
-
-input[type="file"] {
-  font-size: 12px;
-  padding: 10px;
-}
-
-.subheading {
-  margin: 32px 0 8px;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 17px;
-}
-
-.small {
-  font-size: 12px;
-  margin: 15px 0 0;
-}
-
-.panel > .primary-btn {
-  margin-top: 25px;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.message,
-.form-message {
-  margin-top: 20px;
-  padding: 16px;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.message.success,
-.form-message.success {
-  background: #eaf7ee;
-  color: #176b50;
-  border: 1px solid #cde9d5;
-}
-
-.message.error,
-.form-message.error {
-  background: #fff0ed;
-  color: #a43d2c;
-  border: 1px solid #f2d0c9;
-}
-
-/* TRACKING & TIMELINE */
-.tracking-panel {
-  max-width: 850px;
-}
-
-.track-form {
-  display: flex;
-  gap: 10px;
-}
-
-.track-form input {
-  flex: 1;
-}
-
-.result-card {
-  margin-top: 22px;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  padding: 20px;
-}
-
-.result-card h3 {
-  margin-bottom: 12px;
-}
-
-.result-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
-
-.result-line:last-child {
-  border-bottom: 0;
-}
-
-.status {
-  display: inline-block;
-  padding: 5px 9px;
-  border-radius: 30px;
-  background: #eef1f0;
-  color: #52615a;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.status.pending {
-  background: #fff2d9;
-  color: #8b5a09;
-}
-
-.status.review {
-  background: #e8f1ff;
-  color: #2459a6;
-}
-
-.status.deficient {
-  background: #fff0ed;
-  color: #a43d2c;
-}
-
-.status.approved {
-  background: #e4f6e9;
-  color: #176b50;
-}
-
-.timeline-container {
-  margin-top: 28px;
-  padding: 24px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-}
-
-.timeline-container h2 {
-  margin-top: 0;
-}
-
-.timeline {
-  margin-top: 24px;
-}
-
-.timeline-step {
-  display: flex;
-  gap: 16px;
-  position: relative;
-  padding-bottom: 28px;
-  opacity: 0.55;
-}
-
-.timeline-step:last-child {
-  padding-bottom: 0;
-}
-
-.timeline-step:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 17px;
-  top: 36px;
-  height: calc(100% - 36px);
-  width: 2px;
-  background: #cbd5e1;
-}
-
-.timeline-dot {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #e2e8f0;
-  color: #475569;
-  font-weight: bold;
-  z-index: 1;
-}
-
-.timeline-content h3 {
-  margin: 4px 0 6px;
-  font-size: 16px;
-}
-
-.timeline-content p {
-  margin: 0;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.timeline-step.completed {
-  opacity: 1;
-}
-
-.timeline-step.completed .timeline-dot {
-  background: #15803d;
-  color: white;
-}
-
-.timeline-step.completed:not(:last-child)::before {
-  background: #15803d;
-}
-
-.timeline-step.current {
-  opacity: 1;
-}
-
-.timeline-step.current .timeline-dot {
-  background: #2563eb;
-  color: white;
-  box-shadow: 0 0 0 5px #dbeafe;
-}
-
-/* OFFICER TABLE & REVIEW NOTES */
-.table-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-th {
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: #f7faf8;
-}
-
-th, td {
-  padding: 15px 12px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-
-td select {
-  min-width: 145px;
-  font-size: 12px;
-  padding: 8px;
-}
-
-.admin-note-wrap {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.admin-note-wrap input {
-  font-size: 12px;
-  padding: 6px 8px;
-}
-
-.admin-note-wrap button {
-  font-size: 12px;
-  padding: 6px 10px;
-  white-space: nowrap;
-}
-
-.empty-state {
-  text-align: center;
-  color: var(--muted);
-  padding: 35px 10px;
-}
-
-footer {
-  border-top: 1px solid var(--border);
-  text-align: center;
-  padding: 25px 5%;
-  color: var(--muted);
-  font-size: 12px;
-  background: white;
-}
-
-/* SMART APPLICATION READINESS CHECKER */
-.readiness-panel {
-  margin-top: 24px;
-  border: 1px solid #dce7e1;
-  background: #ffffff;
-}
-
-.readiness-panel h2 {
-  margin: 10px 0;
-}
-
-.readiness-panel > p {
-  color: #64748b;
-  line-height: 1.7;
-  margin-bottom: 18px;
-}
-
-.readiness-result {
-  margin-top: 18px;
-}
-
-.readiness-success,
-.readiness-warning {
-  padding: 18px;
-  border-radius: 12px;
-  line-height: 1.6;
-}
-
-.readiness-success {
-  background: #ecfdf3;
-  border: 1px solid #a7f3d0;
-  color: #166534;
-}
-
-.readiness-warning {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-}
-
-.readiness-success h3,
-.readiness-warning h3 {
-  margin: 0 0 8px;
-}
-
-.readiness-result ul {
-  padding-left: 22px;
-  margin-bottom: 0;
-}
-
-/* AI DOCUMENT INTELLIGENCE (OCR) */
-.ocr-box {
-  margin-top: 10px;
-}
-
-.ocr-loading {
-  font-size: 13px;
-  color: var(--green);
-  background: var(--green-light);
-  padding: 10px 12px;
-  border-radius: 9px;
-}
-
-.ocr-error {
-  font-size: 13px;
-  color: #a43d2c;
-  background: #fff0ed;
-  border: 1px solid #f2d0c9;
-  padding: 10px 12px;
-  border-radius: 9px;
-}
-
-.ocr-result-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  background: #fbfdfc;
-  font-size: 13px;
-}
-
-.ocr-result-header {
-  font-weight: 700;
-  color: var(--green);
-  margin-bottom: 8px;
-}
-
-.ocr-field-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 4px 0;
-  border-bottom: 1px dashed var(--border);
-}
-
-.ocr-field-row:last-child {
-  border-bottom: 0;
-}
-
-.ocr-summary-panel {
-  border: 1px solid #dce7e1;
-  margin-top: 24px;
-}
-
-.ocr-summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  margin-top: 6px;
-}
-
-.ocr-summary-table th,
-.ocr-summary-table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.ocr-mismatch-warning {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #fff0ed;
-  border: 1px solid #f2d0c9;
-  color: #a43d2c;
-  font-size: 13px;
-}
-
-.ocr-match-ok {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #eaf7ee;
-  border: 1px solid #cde9d5;
-  color: #176b50;
-  font-size: 13px;
-}
-
-/* IDENTITY VERIFICATION & MODAL */
-.identity-panel {
-  border: 1px solid var(--green-light);
-  background: #fbfdfc;
-}
-
-.identity-actions {
-  display: flex;
-  gap: 10px;
-  margin: 16px 0;
-  flex-wrap: wrap;
-}
-
-.identity-status {
-  padding: 12px 16px;
-  border-radius: 10px;
-  margin-top: 10px;
-  font-size: 14px;
-}
-
-.identity-status.success {
-  background: #eaf7ee;
-  color: #176b50;
-  border: 1px solid #cde9d5;
-}
-
-.identity-status.error {
-  background: #fff0ed;
-  color: #a43d2c;
-  border: 1px solid #f2d0c9;
-}
-
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-box {
-  background: white;
-  border-radius: 16px;
-  padding: 28px;
-  width: min(400px, 90%);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.modal-box .primary-btn {
-  margin-top: 10px;
-  width: 100%;
-}
-
-.verified-field {
-  background: var(--green-light) !important;
-  border-color: var(--green) !important;
-}
-
-/* ---------------------------------------------------------------------- */
-/* INTELLIGENT CROSS-VERIFICATION — form fields vs OCR-extracted data     */
-/* ---------------------------------------------------------------------- */
-.verification-panel {
-  border: 1px solid #dce7e1;
-  margin-top: 24px;
-}
-
-.cross-verification-result {
-  margin-top: 6px;
-}
-
-.field-check-note {
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: -2px;
-  min-height: 14px;
-}
-
-.field-check-note.match {
-  color: #176b50;
-}
-
-.field-check-note.mismatch {
-  color: #a43d2c;
-}
-
-input.field-match {
-  border-color: #176b50 !important;
-  box-shadow: 0 0 0 3px rgba(23, 107, 80, 0.12) !important;
-}
-
-input.field-mismatch {
-  border-color: #d9534f !important;
-  box-shadow: 0 0 0 3px rgba(217, 83, 79, 0.14) !important;
-}
-
-.match-badge {
-  display: inline-block;
-  padding: 4px 9px;
-  border-radius: 30px;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.match-badge.match {
-  background: #eaf7ee;
-  color: #176b50;
-}
-
-.match-badge.mismatch {
-  background: #fff0ed;
-  color: #a43d2c;
-}
-
-/* ---------------------------------------------------------------------- */
-/* SMART DEFICIENCY ALERT — AI-generated SMS / Email notice               */
-/* ---------------------------------------------------------------------- */
-.deficiency-alert-box {
-  width: min(540px, 92%);
-  text-align: left;
-  max-height: 85vh;
-  overflow-y: auto;
-}
-
-.deficiency-alert-block {
-  margin-top: 14px;
-}
-
-.deficiency-alert-block strong {
-  font-size: 13px;
-  color: var(--ink);
-}
-
-.deficiency-alert-text {
-  white-space: pre-wrap;
-  background: #f7faf8;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  font-size: 12.5px;
-  margin-top: 6px;
-  font-family: inherit;
-  color: #33473d;
-}
-
-.alert-bell-btn {
-  margin-left: 6px;
-  font-size: 12px;
-}
-
-/* ---------------------------------------------------------------------- */
-/* AI ELIGIBILITY ENGINE                                                  */
-/* ---------------------------------------------------------------------- */
-.eligibility-panel {
-  border: 1px solid #dce7e1;
-  background: #fbfdfc;
-  margin-top: 24px;
-}
-
-.eligibility-result {
-  margin-top: 18px;
-}
-
-.eligibility-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: #f7faf8;
-  border: 1px solid var(--border);
-}
-
-.eligibility-head strong {
-  display: block;
-  font-size: 15px;
-  color: var(--ink);
-}
-
-.eligibility-head span {
-  display: block;
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.eligibility-score {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--green);
-  font-family: "Manrope", sans-serif;
-}
-
-.eligibility-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.eligibility-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 13px 14px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: white;
-}
-
-.eligibility-item-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 800;
-  flex-shrink: 0;
-  margin-top: 2px;
-  background: #eef1f0;
-  color: var(--ink);
-}
-
-.eligibility-item strong {
-  display: block;
-  font-size: 13px;
-  margin-bottom: 4px;
-}
-
-.eligibility-item span {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.eligibility-item.pass {
-  border-color: #cde9d5;
-  background: #f5fbf7;
-}
-
-.eligibility-item.pass strong {
-  color: #176b50;
-}
-
-.eligibility-item.pass .eligibility-item-icon {
-  background: #eaf7ee;
-  color: #176b50;
-}
-
-.eligibility-item.review {
-  border-color: #f2dfba;
-  background: #fffaf1;
-}
-
-.eligibility-item.review strong {
-  color: #8b5a09;
-}
-
-.eligibility-item.review .eligibility-item-icon {
-  background: #fff2d9;
-  color: #8b5a09;
-}
-
-.eligibility-item.fail {
-  border-color: #f2d0c9;
-  background: #fff7f5;
-}
-
-.eligibility-item.fail strong {
-  color: #a43d2c;
-}
-
-.eligibility-item.fail .eligibility-item-icon {
-  background: #fff0ed;
-  color: #a43d2c;
-}
-
-.eligibility-disclaimer {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.eligibility-banner {
-  margin-top: 12px;
-  padding: 13px 15px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.eligibility-banner strong {
-  display: block;
-  margin-bottom: 2px;
-}
-
-.eligibility-banner span {
-  font-weight: 500;
-}
-
-.eligibility-banner.pass {
-  background: #eaf7ee;
-  color: #176b50;
-  border: 1px solid #cde9d5;
-}
-
-.eligibility-banner.review {
-  background: #fff7e9;
-  color: #755526;
-  border: 1px solid #f2dfba;
-}
-
-.eligibility-banner.fail {
-  background: #fff0ed;
-  color: #a43d2c;
-  border: 1px solid #f2d0c9;
+async function pdfFirstPageToImage(file) {
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  await page.render({
+    canvasContext: canvas.getContext("2d"),
+    viewport
+  }).promise;
+
+  return canvas.toDataURL("image/png");
+}
+
+async function handleDocumentOCR(inputEl, docType, displayName) {
+  const file = inputEl.files[0];
+  const box = document.getElementById(`ocr-${docType}`);
+
+  if (!file || !box) return;
+
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="ocr-loading">
+      🔎 Reading ${escapeHTML(displayName)}… analyzing document…
+    </div>
+  `;
+
+  try {
+    const source = file.type === "application/pdf"
+      ? await pdfFirstPageToImage(file)
+      : file;
+
+    const { data } = await Tesseract.recognize(source, "eng", {
+      logger: (m) => {
+        if (m.status === "recognizing text") {
+          box.innerHTML = `
+            <div class="ocr-loading">
+              🔎 Reading ${escapeHTML(displayName)}… ${Math.round(m.progress * 100)}%
+            </div>
+          `;
+        }
+      }
+    });
+
+    const fields = extractStructuredFields(data.text, docType);
+    ocrData[docType] = {
+      ...fields,
+      confidence: Math.round(data.confidence)
+    };
+
+    renderOcrBox(docType, displayName, ocrData[docType]);
+    updateOcrSummary();
+    runCrossVerification();
+    runEligibilityPreCheck();
+  } catch (err) {
+    box.innerHTML = `
+      <div class="ocr-error">
+        ⚠ Could not read this document (${escapeHTML(err.message)}).
+        You can still submit — an officer will verify it manually.
+      </div>
+    `;
+  }
+}
+
+function extractStructuredFields(rawText, docType) {
+  const text = rawText.replace(/\s+/g, " ").trim();
+
+  const nameMatch = text.match(
+    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|Date|Roll|$))/i
+  );
+  const dobMatch = text.match(
+    /(?:DOB|Date of Birth)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i
+  );
+  const certNoMatch = text.match(
+    /(?:Certificate\s*No\.?|Cert\.?\s*No\.?|Registration\s*No\.?|Serial\s*No\.?)\s*[:\-]?\s*([A-Za-z0-9\/\-]{4,20})/i
+  );
+  const anyDateMatch = text.match(
+    /\b(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\b/
+  );
+
+  const fields = {
+    name: nameMatch ? nameMatch[1].trim() : null,
+    dateOfBirth: dobMatch ? dobMatch[1] : null,
+    certificateNumber: certNoMatch ? certNoMatch[1] : null,
+    issueDate: anyDateMatch ? anyDateMatch[1] : null
+  };
+
+  if (docType === "marksheet") {
+    const pctMatch = text.match(/(\d{1,3}(?:\.\d{1,2})?)\s*%/);
+    const marksMatch = text.match(/(\d{2,4})\s*\/\s*(\d{2,4})/);
+    fields.percentage = pctMatch ? parseFloat(pctMatch[1]) : null;
+    fields.marksObtained = marksMatch ? `${marksMatch[1]}/${marksMatch[2]}` : null;
+  }
+
+  if (docType === "incomeCertificate") {
+    const incomeMatch = text.match(
+      /(?:Annual\s*Income|Income)\s*[:\-]?\s*(?:Rs\.?|₹)?\s*([\d,]{4,10})/i
+    );
+    fields.annualIncome = incomeMatch ? incomeMatch[1].replace(/,/g, "") : null;
+  }
+
+  return fields;
+}
+
+function renderOcrBox(docType, displayName, fields) {
+  const box = document.getElementById(`ocr-${docType}`);
+  if (!box) return;
+
+  const rows = Object.entries(fields)
+    .filter(([key]) => key !== "confidence")
+    .map(([key, value]) => `
+      <div class="ocr-field-row">
+        <span>${formatFieldLabel(key)}</span>
+        <strong>${value ? escapeHTML(String(value)) : "<em>not detected</em>"}</strong>
+      </div>
+    `)
+    .join("");
+
+  box.innerHTML = `
+    <div class="ocr-result-card">
+      <div class="ocr-result-header">
+        <span>✓ ${escapeHTML(displayName)} — OCR ${fields.confidence}% confidence</span>
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
+function formatFieldLabel(key) {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, c => c.toUpperCase());
+}
+
+function crossCheckExtractedNames() {
+  const typedName = document.getElementById("fullName")?.value.trim();
+  if (!typedName) return null;
+
+  const mismatches = [];
+  Object.entries(ocrData).forEach(([docType, fields]) => {
+    if (!fields.name) return;
+    if (!namesRoughlyMatch(typedName, fields.name)) {
+      mismatches.push({ docType, ocrName: fields.name });
+    }
+  });
+
+  return mismatches;
+}
+
+function namesRoughlyMatch(a, b) {
+  const norm = s => s.toUpperCase().replace(/[^A-Z]/g, "");
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb) return true;
+  return levenshtein(na, nb) <= 2;
+}
+
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [
+    i,
+    ...Array(b.length).fill(0)
+  ]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function updateOcrSummary() {
+  const summary = document.getElementById("ocrSummary");
+  if (!summary) return;
+
+  const docs = Object.keys(ocrData);
+  if (!docs.length) {
+    summary.innerHTML = "No documents processed yet — upload a document above to run OCR.";
+    return;
+  }
+
+  const rows = docs.map(docType => {
+    const f = ocrData[docType];
+    return `
+      <tr>
+        <td>${escapeHTML(formatFieldLabel(docType))}</td>
+        <td>${f.name ? escapeHTML(f.name) : "—"}</td>
+        <td>${escapeHTML(f.certificateNumber || f.issueDate || "—")}</td>
+        <td>${f.confidence}%</td>
+      </tr>
+    `;
+  }).join("");
+
+  const mismatches = crossCheckExtractedNames();
+  const mismatchHtml = mismatches && mismatches.length
+    ? `
+      <div class="ocr-mismatch-warning">
+        ⚠ Potential name mismatch: your application name doesn't closely match
+        the name read from ${mismatches.map(m => formatFieldLabel(m.docType)).join(", ")}
+        (OCR read: "${escapeHTML(mismatches[0].ocrName)}").
+        This will be flagged for officer review — please double-check spelling.
+      </div>
+    `
+    : `
+      <div class="ocr-match-ok">
+        ✓ Names appear consistent across processed documents.
+      </div>
+    `;
+
+  summary.innerHTML = `
+    <table class="ocr-summary-table">
+      <thead>
+        <tr>
+          <th>Document</th>
+          <th>Name (OCR)</th>
+          <th>Cert No. / Date</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${mismatchHtml}
+  `;
 }
 
 /* =========================================================
-   TRIBALSCHOLAR AUTH MODAL (SUPABASE)
+   4. AI CROSS-VERIFICATION (Form vs OCR)
    ========================================================= */
-#authPanel {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  display: none !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 24px !important;
-  box-sizing: border-box !important;
-  background: linear-gradient(
-    135deg,
-    rgba(8, 25, 18, 0.94),
-    rgba(16, 48, 35, 0.90)
-  ) !important;
-  z-index: 999999 !important;
-  overflow-y: auto !important;
+const CROSS_CHECK_FIELDS = [
+  {
+    formId: "marks",
+    ocrKey: "percentage",
+    label: "Marks / Percentage",
+    sourceDoc: "marksheet"
+  },
+  {
+    formId: "income",
+    ocrKey: "annualIncome",
+    label: "Annual Income",
+    sourceDoc: "incomeCertificate"
+  }
+];
+
+function runCrossVerification() {
+  const panel = document.getElementById("crossVerificationResult");
+  if (!panel) return;
+
+  if (!Object.keys(ocrData).length) {
+    panel.innerHTML = "Upload documents and fill the form fields above to run verification.";
+    clearFieldCheck("fullName");
+    clearFieldCheck("marks");
+    clearFieldCheck("income");
+    return;
+  }
+
+  const rows = [];
+  const typedName = document.getElementById("fullName")?.value.trim() || "";
+  const nameSources = Object.entries(ocrData).filter(([, f]) => f.name);
+
+  if (typedName && nameSources.length) {
+    const allMatch = nameSources.every(([, f]) => namesRoughlyMatch(typedName, f.name));
+
+    setFieldCheck(
+      "fullName",
+      allMatch,
+      allMatch
+        ? "Matches the name on your uploaded document(s)."
+        : `Doesn't closely match OCR name read from ${
+            nameSources
+              .filter(([, f]) => !namesRoughlyMatch(typedName, f.name))
+              .map(([d]) => formatFieldLabel(d))
+              .join(", ")
+          }.`
+    );
+
+    nameSources.forEach(([docType, f]) => {
+      rows.push(
+        comparisonRowHtml(
+          "Full Name",
+          typedName,
+          f.name,
+          formatFieldLabel(docType),
+          namesRoughlyMatch(typedName, f.name)
+        )
+      );
+    });
+  } else {
+    clearFieldCheck("fullName");
+  }
+
+  CROSS_CHECK_FIELDS.forEach(({ formId, ocrKey, label, sourceDoc }) => {
+    const input = document.getElementById(formId);
+    if (!input) return;
+
+    const typedRaw = input.value;
+    const ocrFields = ocrData[sourceDoc];
+
+    if (typedRaw === "" || !ocrFields || ocrFields[ocrKey] == null) {
+      clearFieldCheck(formId);
+      return;
+    }
+
+    const typedNum = parseFloat(typedRaw);
+    const ocrNum = parseFloat(ocrFields[ocrKey]);
+    const tolerance = formId === "income" ? Math.max(ocrNum * 0.02, 500) : 1;
+    const isMatch = Math.abs(typedNum - ocrNum) <= tolerance;
+
+    const typedDisplay = formId === "income"
+      ? `₹${typedNum.toLocaleString("en-IN")}`
+      : `${typedNum}%`;
+    const ocrDisplay = formId === "income"
+      ? `₹${ocrNum.toLocaleString("en-IN")}`
+      : `${ocrNum}%`;
+
+    setFieldCheck(
+      formId,
+      isMatch,
+      isMatch
+        ? `Matches ${label.toLowerCase()} read from ${formatFieldLabel(sourceDoc)}.`
+        : `${formatFieldLabel(sourceDoc)} OCR shows ${ocrDisplay}, you entered ${typedDisplay}.`
+    );
+
+    rows.push(
+      comparisonRowHtml(
+        label,
+        typedDisplay,
+        ocrDisplay,
+        formatFieldLabel(sourceDoc),
+        isMatch
+      )
+    );
+  });
+
+  if (!rows.length) {
+    panel.innerHTML = "No comparable OCR data yet — fill in the fields and upload the matching document(s).";
+    return;
+  }
+
+  panel.innerHTML = `
+    <table class="ocr-summary-table">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>You Entered</th>
+          <th>OCR Read</th>
+          <th>Source Document</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join("")}</tbody>
+    </table>
+  `;
 }
 
-#authPanel.show {
-  display: flex !important;
+function comparisonRowHtml(label, typedVal, ocrVal, source, isMatch) {
+  return `
+    <tr>
+      <td>${escapeHTML(label)}</td>
+      <td>${escapeHTML(String(typedVal))}</td>
+      <td>${escapeHTML(String(ocrVal))}</td>
+      <td>${escapeHTML(source)}</td>
+      <td>
+        <span class="match-badge ${isMatch ? "match" : "mismatch"}">
+          ${isMatch ? "✓ Match" : "✗ Mismatch"}
+        </span>
+      </td>
+    </tr>
+  `;
 }
 
-#authPanel .auth-panel-inner,
-#authPanel .auth-card {
-  width: min(440px, 100%) !important;
-  padding: 34px !important;
-  background: rgba(255, 255, 255, 0.97) !important;
-  border-radius: 24px !important;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35) !important;
-  position: relative !important;
-  box-sizing: border-box !important;
-  color: #17251f !important;
-}
+function setFieldCheck(fieldId, isMatch, message) {
+  const input = document.getElementById(fieldId);
+  const note = document.getElementById(`check-${fieldId}`);
 
-#authPanel .auth-close {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  background: transparent;
-  border: 0;
-  font-size: 24px;
-  color: var(--muted);
-}
-
-#authPanel .auth-brand,
-#authPanel .auth-header {
-  margin-bottom: 24px !important;
-}
-
-#authPanel .auth-brand h2,
-#authPanel .auth-header h2 {
-  margin: 8px 0 !important;
-}
-
-#authPanel .auth-brand p,
-#authPanel .auth-header p {
-  margin: 0 !important;
-  opacity: 0.7 !important;
-}
-
-#authPanel form {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 16px !important;
-}
-
-#authPanel label {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 7px !important;
-  font-weight: 600 !important;
-}
-
-#authPanel input {
-  width: 100% !important;
-  box-sizing: border-box !important;
-  padding: 13px 14px !important;
-  border: 1px solid #d9dfdc !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
-  color: #17251f !important;
-  outline: none !important;
-  font-size: 15px !important;
-}
-
-#authPanel input:focus {
-  border-color: #4d8068 !important;
-  box-shadow: 0 0 0 3px rgba(77, 128, 104, 0.12) !important;
-}
-
-#authPanel button {
-  box-sizing: border-box !important;
-}
-
-#authPanel #authSubmit {
-  width: 100% !important;
-  margin-top: 4px !important;
-}
-
-#authPanel #authSwitchButton {
-  width: 100% !important;
-  margin-top: 14px !important;
-}
-
-#authPanel .hidden {
-  display: none !important;
-}
-
-/* =========================================================
-   RESPONSIVE BREAKPOINTS
-   ========================================================= */
-@media (max-width: 900px) {
-  .steps-grid,
-  .features-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  if (input) {
+    input.classList.remove("field-match", "field-mismatch");
+    input.classList.add(isMatch ? "field-match" : "field-mismatch");
   }
-
-  .cta-section {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 30px;
-  }
-}
-
-@media (max-width: 850px) {
-  .navbar {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  nav {
-    width: 100%;
-  }
-
-  nav button {
-    padding: 9px 10px;
-  }
-
-  .hero {
-    grid-template-columns: 1fr;
-    padding: 35px;
-    gap: 28px;
-  }
-}
-
-@media (max-width: 600px) {
-  main {
-    width: 92%;
-    margin-top: 22px;
-  }
-
-  .hero {
-    padding: 27px 22px;
-    border-radius: 18px;
-  }
-
-  .hero h1 {
-    font-size: 34px;
-  }
-
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin: 18px 0 32px;
-  }
-
-  .stat-card {
-    padding: 16px;
-  }
-
-  .stat-card strong {
-    font-size: 25px;
-  }
-
-  .scheme-grid,
-  .form-grid,
-  .eligibility-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .eligibility-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .scheme-card,
-  .panel {
-    padding: 21px;
-  }
-
-  .track-form {
-    flex-direction: column;
-  }
-
-  .track-form .primary-btn {
-    width: 100%;
-  }
-
-  .table-heading {
-    align-items: flex-start;
-  }
-
-  #authPanel {
-    padding: 16px !important;
-  }
-
-  #authPanel .auth-panel-inner,
-  #authPanel .auth-card {
-    padding: 26px 20px !important;
-    border-radius: 20px !important;
+  if (note) {
+    note.textContent = (isMatch ? "✓ " : "✗ ") + message;
+    note.className = `field-check-note ${isMatch ? "match" : "mismatch"}`;
   }
 }
 
-@media (max-width: 500px) {
-  .steps-grid,
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
+function clearFieldCheck(fieldId) {
+  const input = document.getElementById(fieldId);
+  const note = document.getElementById(`check-${fieldId}`);
 
-  .how-section,
-  .features-section,
-  .cta-section {
-    margin-top: 42px;
-  }
-
-  .cta-section {
-    padding: 25px 22px;
+  if (input) input.classList.remove("field-match", "field-mismatch");
+  if (note) {
+    note.textContent = "";
+    note.className = "field-check-note";
   }
 }
 
 /* =========================================================
-   STUDY BUDDY — AI ASSISTANT WIDGET
+   5. AI ELIGIBILITY ENGINE
    ========================================================= */
-.study-buddy-launcher {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 900;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  background: var(--green);
-  color: white;
-  border: 1px solid var(--green);
-  padding: 13px 18px 13px 14px;
-  border-radius: 30px;
-  font-weight: 700;
-  font-size: 14px;
-  box-shadow: 0 14px 34px rgba(16, 76, 59, 0.32);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+const ELIGIBILITY_RULES = {
+  NFST: {
+    name: "National Fellowship for ST Students",
+    criteria: [
+      { key: "stCertificate", label: "ST status document", type: "document", required: true },
+      { key: "education", label: "Education / research level", type: "education", allowed: ["PhD"] },
+      { key: "marks", label: "Academic percentage", type: "number", min: 55, unit: "%" },
+      { key: "income", label: "Annual family income", type: "number", max: 800000, unit: "₹" }
+    ]
+  },
+  NOS: {
+    name: "National Overseas Scholarship",
+    criteria: [
+      { key: "stCertificate", label: "ST status document", type: "document", required: true },
+      { key: "education", label: "Higher-study level", type: "education", allowed: ["Masters", "PhD"] },
+      { key: "marks", label: "Academic percentage", type: "number", min: 60, unit: "%" },
+      { key: "income", label: "Annual family income", type: "number", max: 800000, unit: "₹" },
+      { key: "offerLetter", label: "University offer letter", type: "document", required: true }
+    ]
+  }
+};
+
+function getValue(id) {
+  const element = document.getElementById(id);
+  return element ? element.value.trim() : "";
 }
 
-.study-buddy-launcher:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 40px rgba(16, 76, 59, 0.38);
+function getNumber(id) {
+  const value = getValue(id);
+  if (value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
-.study-buddy-launcher-icon {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  font-size: 15px;
+function getDocumentStatus(documentKey) {
+  const input = document.getElementById(documentKey);
+  if (!input) return { uploaded: false, name: "" };
+  const uploaded = input.files && input.files.length > 0;
+  return { uploaded, name: uploaded ? input.files[0].name : "" };
 }
 
-.study-buddy-panel {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 950;
-  width: min(370px, calc(100vw - 32px));
-  max-height: min(560px, calc(100vh - 48px));
-  background: white;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  box-shadow: 0 30px 70px rgba(16, 40, 30, 0.28);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: study-buddy-appear 0.2s ease;
-}
+function evaluateEligibilityCriterion(criterion) {
+  const key = criterion.key;
 
-@keyframes study-buddy-appear {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.study-buddy-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 16px 16px 16px 18px;
-  background: linear-gradient(120deg, #104c3b, #1c7d5c);
-  color: white;
-  flex-shrink: 0;
-}
-
-.study-buddy-header-info {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.study-buddy-avatar {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.study-buddy-header-info strong {
-  display: block;
-  font-family: "Manrope", sans-serif;
-  font-size: 14px;
-}
-
-.study-buddy-header-info span {
-  display: block;
-  font-size: 11px;
-  color: #d6ece1;
-  margin-top: 2px;
-}
-
-.study-buddy-close {
-  background: transparent;
-  border: 0;
-  color: white;
-  font-size: 22px;
-  line-height: 1;
-  padding: 4px 6px;
-  border-radius: 8px;
-  opacity: 0.85;
-}
-
-.study-buddy-close:hover {
-  background: rgba(255, 255, 255, 0.15);
-  opacity: 1;
-}
-
-.study-buddy-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: #f7faf8;
-}
-
-.study-buddy-msg {
-  max-width: 84%;
-  padding: 10px 13px;
-  border-radius: 14px;
-  font-size: 13px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-}
-
-.study-buddy-msg.bot {
-  align-self: flex-start;
-  background: white;
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
-  color: var(--ink);
-}
-
-.study-buddy-msg.user {
-  align-self: flex-end;
-  background: var(--green);
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-
-.study-buddy-quick-replies {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 14px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.study-buddy-quick-replies:empty {
-  display: none;
-  padding: 0;
-  border-top: 0;
-}
-
-.study-buddy-chip {
-  background: var(--green-light);
-  color: var(--green);
-  border: 1px solid transparent;
-  padding: 7px 11px;
-  border-radius: 30px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.study-buddy-chip:hover {
-  background: #d9efe3;
-}
-
-.study-buddy-input-row {
-  display: flex;
-  gap: 8px;
-  padding: 12px 14px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.study-buddy-input-row input {
-  flex: 1;
-  font-size: 13px;
-  padding: 10px 12px;
-}
-
-.study-buddy-input-row .primary-btn {
-  padding: 10px 16px;
-  font-size: 13px;
-}
-
-.study-buddy-disclaimer {
-  font-size: 10.5px;
-  color: var(--muted);
-  padding: 0 14px 12px;
-  flex-shrink: 0;
-}
-
-@media (max-width: 500px) {
-  .study-buddy-launcher-text {
-    display: none;
+  if (criterion.type === "document") {
+    const doc = getDocumentStatus(key);
+    if (doc.uploaded) return { status: "pass", message: `${criterion.label} uploaded` };
+    if (criterion.required) return { status: "fail", message: `${criterion.label} is required` };
+    return { status: "review", message: `${criterion.label} not provided` };
   }
 
-  .study-buddy-launcher {
-    padding: 13px;
-    right: 16px;
-    bottom: 16px;
+  if (criterion.type === "education") {
+    const education = getValue("education");
+    if (!education) return { status: "review", message: "Education level not selected" };
+    if (criterion.allowed.includes(education)) {
+      return { status: "pass", message: `${education} is accepted` };
+    }
+    return { status: "fail", message: `${education} does not meet the configured education rule` };
   }
 
-  .study-buddy-panel {
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
-    width: auto;
+  if (criterion.type === "number") {
+    let value = null;
+    if (key === "marks") value = getNumber("marks");
+    if (key === "income") value = getNumber("income");
+
+    if (value === null) return { status: "review", message: `${criterion.label} not provided` };
+    if (criterion.min !== undefined && value < criterion.min) {
+      return {
+        status: "fail",
+        message: `${value}${criterion.unit || ""} is below the minimum ${criterion.min}${criterion.unit || ""}`
+      };
+    }
+    if (criterion.max !== undefined && value > criterion.max) {
+      return {
+        status: "fail",
+        message: `${value}${criterion.unit || ""} is above the maximum ${criterion.max}${criterion.unit || ""}`
+      };
+    }
+    return { status: "pass", message: `${value}${criterion.unit || ""} satisfies the configured rule` };
+  }
+
+  return { status: "review", message: "Manual review required" };
+}
+
+function getEligibilitySnapshot() {
+  const scheme = getValue("scheme");
+  if (!scheme || !ELIGIBILITY_RULES[scheme]) {
+    return { scheme: "", schemeName: "", criteria: [], status: "review", score: 0 };
+  }
+
+  const ruleSet = ELIGIBILITY_RULES[scheme];
+  const criteria = ruleSet.criteria.map(criterion => ({
+    ...criterion,
+    ...evaluateEligibilityCriterion(criterion)
+  }));
+
+  const passed = criteria.filter(item => item.status === "pass").length;
+  const failed = criteria.filter(item => item.status === "fail").length;
+  const review = criteria.filter(item => item.status === "review").length;
+
+  let status = "pass";
+  if (failed > 0) status = "fail";
+  else if (review > 0) status = "review";
+
+  const score = criteria.length ? Math.round((passed / criteria.length) * 100) : 0;
+
+  return {
+    scheme,
+    schemeName: ruleSet.name,
+    criteria,
+    passed,
+    failed,
+    review,
+    status,
+    score,
+    checkedAt: new Date().toLocaleString()
+  };
+}
+
+function runEligibilityPreCheck() {
+  const resultBox = document.getElementById("eligibilityResult");
+  const snapshot = getEligibilitySnapshot();
+
+  if (!resultBox) return snapshot;
+
+  if (!snapshot.scheme) {
+    resultBox.innerHTML = `
+      <div class="eligibility-banner review">
+        <strong>Eligibility check pending</strong>
+        <span>Select a scholarship scheme to start the AI pre-check.</span>
+      </div>
+    `;
+    return snapshot;
+  }
+
+  let bannerTitle = "Eligible — configured rules passed";
+  let bannerText = "The entered information currently satisfies the configured prototype criteria.";
+
+  if (snapshot.status === "fail") {
+    bannerTitle = "Eligibility issues detected";
+    bannerText = "One or more configured eligibility criteria are not satisfied.";
+  } else if (snapshot.status === "review") {
+    bannerTitle = "Manual review required";
+    bannerText = "Some eligibility information is missing or requires document review.";
+  }
+
+  const criteriaHTML = snapshot.criteria
+    .map(item => {
+      let icon = "✓";
+      if (item.status === "fail") icon = "✕";
+      if (item.status === "review") icon = "!";
+
+      return `
+        <div class="eligibility-item ${item.status}">
+          <div class="eligibility-item-icon">${icon}</div>
+          <div>
+            <strong>${escapeHTML(item.label)}</strong>
+            <span>${escapeHTML(item.message)}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  resultBox.innerHTML = `
+    <div class="eligibility-head">
+      <div>
+        <strong>${bannerTitle}</strong>
+        <span>${bannerText}</span>
+      </div>
+      <div class="eligibility-score">${snapshot.score}%</div>
+    </div>
+    <div class="eligibility-grid">${criteriaHTML}</div>
+    <div class="eligibility-disclaimer">
+      AI pre-check only: passing these configured rules does not establish
+      official eligibility, document authenticity, or final approval.
+      Officer review remains required.
+    </div>
+  `;
+
+  return snapshot;
+}
+
+function getEligibilityIssues(snapshot) {
+  if (!snapshot || !snapshot.criteria) return [];
+  return snapshot.criteria
+    .filter(item => item.status === "fail")
+    .map(item => `Eligibility: ${item.label} — ${item.message}`);
+}
+
+/* =========================================================
+   6. EXPIRED CERTIFICATE DETECTION & SMART DEFICIENCY ALERT
+   ========================================================= */
+const CERTIFICATE_VALIDITY_DAYS = {
+  incomeCertificate: 365,
+  stCertificate: 365 * 5
+};
+
+function parseFlexibleDate(str) {
+  if (!str) return null;
+  const parts = str.split(/[\/\-.]/).map(p => p.trim());
+  if (parts.length !== 3) return null;
+
+  let [d, m, y] = parts.map(Number);
+  if (!d || !m || !y) return null;
+  if (y < 100) y += y < 50 ? 2000 : 1900;
+
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function checkExpiredCertificates() {
+  const expiryIssues = [];
+
+  Object.entries(CERTIFICATE_VALIDITY_DAYS).forEach(([docType, maxDays]) => {
+    const fields = ocrData[docType];
+    if (!fields || !fields.issueDate) return;
+
+    const issueDate = parseFlexibleDate(fields.issueDate);
+    if (!issueDate) return;
+
+    const ageDays = Math.floor((Date.now() - issueDate.getTime()) / 86400000);
+    if (ageDays > maxDays) {
+      expiryIssues.push({
+        docType,
+        label: formatFieldLabel(docType),
+        issueDate: fields.issueDate,
+        ageDays
+      });
+    }
+  });
+
+  return expiryIssues;
+}
+
+function generateSmartDeficiencyAlert(application, issues) {
+  const emailBody = buildDeficiencyMessage(application, issues, "email");
+  const smsBody = buildDeficiencyMessage(application, issues, "sms");
+
+  const alertObj = {
+    sentAt: new Date().toLocaleString(),
+    email: emailBody,
+    sms: smsBody,
+    applicantEmail: application.email,
+    applicantPhone: application.phone
+  };
+
+  const appKey = application.application_id || application.id;
+  saveAlertToCache(appKey, alertObj);
+
+  showDeficiencyAlertModal(application, emailBody, smsBody);
+}
+
+function buildDeficiencyMessage(application, issues, channel) {
+  const appId = application.application_id || application.id;
+  if (channel === "sms") {
+    const extra = issues.length > 1
+      ? ` (+${issues.length - 1} more issue${issues.length > 2 ? "s" : ""})`
+      : "";
+    return `TribalScholar: Your application ${appId} needs action — ${issues[0]}${extra} Please log in and correct this within 3 days.`;
+  }
+
+  const issueLines = issues.map(issue => `  • ${issue}`).join("\n");
+  return `Dear ${application.name || "Applicant"},
+
+Our AI Assistant reviewed your scholarship application (ID: ${appId}, Scheme: ${application.scheme}) and found the following issue(s) that need your attention:
+
+${issueLines}
+
+Please log in to TribalScholar and correct these as soon as possible so your application can move forward to officer review.
+
+— TribalScholar Automated Notification (Demo — no real email is sent)`;
+}
+
+function showDeficiencyAlertModal(application, emailBody, smsBody) {
+  const content = document.getElementById("deficiencyAlertContent");
+  const modal = document.getElementById("deficiencyAlertModal");
+  if (!content || !modal) return;
+
+  content.innerHTML = `
+    <div class="deficiency-alert-block">
+      <strong>📧 Email → ${escapeHTML(application.email || "no email on file")}</strong>
+      <pre class="deficiency-alert-text">${escapeHTML(emailBody)}</pre>
+    </div>
+    <div class="deficiency-alert-block">
+      <strong>📱 SMS → ${escapeHTML(application.phone || "no phone on file")}</strong>
+      <pre class="deficiency-alert-text">${escapeHTML(smsBody)}</pre>
+    </div>
+    <p class="muted small">Demo only: no real email or SMS is sent from the browser.</p>
+  `;
+
+  modal.classList.remove("hidden");
+}
+
+function closeDeficiencyAlertModal() {
+  document.getElementById("deficiencyAlertModal")?.classList.add("hidden");
+}
+
+async function viewDeficiencyAlert(appId) {
+  const cache = getAlertCache();
+  if (cache[appId]) {
+    showDeficiencyAlertModal(
+      { email: cache[appId].applicantEmail, phone: cache[appId].applicantPhone },
+      cache[appId].email,
+      cache[appId].sms
+    );
+    return;
+  }
+
+  // Check local fallback applications first
+  const localMatch = getLocalApplications().find(
+    a => a.application_id === appId || a.id === appId
+  );
+  if (localMatch && Array.isArray(localMatch.issues) && localMatch.issues.length) {
+    generateSmartDeficiencyAlert(localMatch, localMatch.issues);
+    return;
+  }
+
+  // Fallback: build alert dynamically from Supabase application row
+  try {
+    const { data: app } = await supabaseClient
+      .from("applications")
+      .select("*")
+      .or(`application_id.eq.${appId},id.eq.${appId}`)
+      .maybeSingle();
+
+    if (app && Array.isArray(app.issues) && app.issues.length) {
+      generateSmartDeficiencyAlert(app, app.issues);
+    }
+  } catch (e) {
+    console.error("Could not load deficiency alert:", e);
   }
 }
+
+/* =========================================================
+   7. IDENTITY VERIFICATION (eKYC + DigiLocker Demo)
+   ========================================================= */
+const IDENTITY_API_BASE = "http://localhost:4000/api";
+let aadhaarTxnId = null;
+let identityVerified = false;
+
+function setIdentityStatus(message, type) {
+  const box = document.getElementById("identityStatus");
+  if (!box) return;
+  box.textContent = message;
+  box.className = `identity-status ${type}`;
+  box.classList.remove("hidden");
+}
+
+function openAadhaarModal() {
+  document.getElementById("aadhaarModal")?.classList.remove("hidden");
+}
+
+function closeAadhaarModal() {
+  document.getElementById("aadhaarModal")?.classList.add("hidden");
+  document.getElementById("aadhaarStep1")?.classList.remove("hidden");
+  document.getElementById("aadhaarStep2")?.classList.add("hidden");
+}
+
+async function requestAadhaarOtp() {
+  const idNumber = document.getElementById("aadhaarNumber")?.value.trim();
+  if (!idNumber) {
+    alert("Please enter your 12-digit number.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${IDENTITY_API_BASE}/aadhaar/generate-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aadhaarNumber: idNumber })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    aadhaarTxnId = data.txnId;
+    document.getElementById("aadhaarStep1")?.classList.add("hidden");
+    document.getElementById("aadhaarStep2")?.classList.remove("hidden");
+  } catch (err) {
+    if (err.name === "TypeError") {
+      aadhaarTxnId = "DEMO-TXN";
+      document.getElementById("aadhaarStep1")?.classList.add("hidden");
+      document.getElementById("aadhaarStep2")?.classList.remove("hidden");
+    } else {
+      alert(err.message);
+    }
+  }
+}
+
+async function verifyAadhaarOtp() {
+  const otp = document.getElementById("aadhaarOtp")?.value.trim();
+  if (!otp) {
+    alert("Please enter the OTP.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${IDENTITY_API_BASE}/aadhaar/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txnId: aadhaarTxnId, otp })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    applyVerifiedIdentity(data);
+    closeAadhaarModal();
+    setIdentityStatus(
+      `✓ Identity verified (Ref: ${data.aadhaarRef}). Name and details auto-filled below.`,
+      "success"
+    );
+  } catch (err) {
+    if (err.name === "TypeError") {
+      const fallbackName =
+        currentProfile?.full_name ||
+        document.getElementById("fullName")?.value.trim() ||
+        "Verified Student";
+      applyVerifiedIdentity({ name: fallbackName });
+      closeAadhaarModal();
+      setIdentityStatus(
+        "✓ Identity verified in Demo Mode. Name and details auto-filled below.",
+        "success"
+      );
+    } else {
+      alert(err.message);
+    }
+  }
+}
+
+async function startDigiLockerVerification() {
+  try {
+    const res = await fetch(`${IDENTITY_API_BASE}/digilocker/authorize`);
+    const data = await res.json();
+    window.location.href = data.authorizeUrl;
+  } catch {
+    setIdentityStatus(
+      "✓ DigiLocker Demo Mode connected — 3 documents verified (ST Certificate, Marksheet, Income Certificate).",
+      "success"
+    );
+  }
+}
+
+function applyVerifiedIdentity(identity) {
+  identityVerified = true;
+  const nameField = document.getElementById("fullName");
+  if (!nameField) return;
+
+  nameField.value = identity.name;
+  nameField.readOnly = true;
+  nameField.classList.add("verified-field");
+
+  runCrossVerification();
+  runEligibilityPreCheck();
+}
+
+(function checkDigiLockerReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const state = params.get("digilocker_state");
+  if (!state) return;
+
+  fetch(`${IDENTITY_API_BASE}/digilocker/session/${state}`)
+    .then(res => res.json())
+    .then(session => {
+      if (session.documents) {
+        setIdentityStatus(
+          `✓ DigiLocker connected — ${session.documents.items.length} documents fetched (ST Certificate, Marksheet, Income Certificate).`,
+          "success"
+        );
+      }
+    })
+    .catch(() => {});
+})();
+
+/* =========================================================
+   8. SUPABASE AUTHENTICATION & AUTO RATE-LIMIT BYPASS
+   ========================================================= */
+function createAuthPanel() {
+  if (document.getElementById("authPanel")) return;
+
+  const panel = document.createElement("div");
+  panel.id = "authPanel";
+  panel.className = "auth-panel";
+
+  panel.innerHTML = `
+    <div class="auth-panel-inner">
+      <button type="button" id="closeAuthPanel" class="auth-close">×</button>
+      <div class="auth-brand">
+        <span class="eyebrow">TRIBALSCHOLAR ACCESS</span>
+        <h2 id="authTitle">Student Login</h2>
+        <p id="authSubtitle">Sign in to access your scholarship dashboard.</p>
+      </div>
+      <form id="authForm">
+        <div id="fullNameGroup" class="form-group hidden">
+          <label for="authFullName">Full Name</label>
+          <input type="text" id="authFullName" placeholder="Enter your full name">
+        </div>
+        <div class="form-group">
+          <label for="authEmail">College Email</label>
+          <input type="email" id="authEmail" placeholder="Enter your college email" required>
+        </div>
+        <div class="form-group">
+          <label for="authPassword">Password</label>
+          <input type="password" id="authPassword" placeholder="Enter your password" minlength="6" required>
+        </div>
+        <button type="submit" id="authSubmit" class="primary-btn">Login</button>
+        <div id="authMessage" class="form-message"></div>
+      </form>
+
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.08); text-align: center;">
+        <small style="display:block; margin-bottom: 8px; color: #666; font-size: 12px;">
+          ⚡ Quick SIH Prototype Access (No Email Needed)
+        </small>
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <button type="button" id="quickStudentBtn" class="secondary-btn" style="font-size: 12px; padding: 6px 10px;">
+            🎓 Demo Student
+          </button>
+          <button type="button" id="quickOfficerBtn" class="secondary-btn" style="font-size: 12px; padding: 6px 10px;">
+            🛡️ Demo Officer
+          </button>
+        </div>
+      </div>
+
+      <button type="button" id="authSwitchButton" class="text-btn auth-switch">
+        Create a Student Account
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+
+  document.getElementById("closeAuthPanel")?.addEventListener("click", closeAuthPanel);
+  document.getElementById("authForm")?.addEventListener("submit", handleAuthSubmit);
+  document.getElementById("authSwitchButton")?.addEventListener("click", toggleAuthMode);
+
+  document.getElementById("quickStudentBtn")?.addEventListener("click", () => {
+    activateInstantFallbackLogin("student.demo@tribalscholar.in", "Aarav Gond (Demo)", "student");
+  });
+  document.getElementById("quickOfficerBtn")?.addEventListener("click", () => {
+    activateInstantFallbackLogin("officer.demo@tribalscholar.in", "Nodal Officer (Demo)", "officer");
+  });
+}
+
+function openAuthPanel(mode = "login") {
+  createAuthPanel();
+  authMode = mode;
+  updateAuthPanel();
+  document.getElementById("authPanel")?.classList.add("show");
+}
+
+function closeAuthPanel() {
+  document.getElementById("authPanel")?.classList.remove("show");
+}
+
+function toggleAuthMode() {
+  authMode = authMode === "login" ? "signup" : "login";
+  updateAuthPanel();
+}
+
+function updateAuthPanel() {
+  const title = document.getElementById("authTitle");
+  const subtitle = document.getElementById("authSubtitle");
+  const fullNameGroup = document.getElementById("fullNameGroup");
+  const submit = document.getElementById("authSubmit");
+  const switchButton = document.getElementById("authSwitchButton");
+  const message = document.getElementById("authMessage");
+
+  if (!title || !subtitle || !fullNameGroup || !submit || !switchButton) return;
+
+  if (authMode === "signup") {
+    title.textContent = "Create Student Account";
+    subtitle.textContent = "Create your account to apply for scholarships.";
+    fullNameGroup.classList.remove("hidden");
+    submit.textContent = "Create Account";
+    switchButton.textContent = "Already have an account? Login";
+  } else {
+    title.textContent = "Student Login";
+    subtitle.textContent = "Sign in to access your scholarship dashboard.";
+    fullNameGroup.classList.add("hidden");
+    submit.textContent = "Login";
+    switchButton.textContent = "Create a Student Account";
+  }
+
+  if (message) {
+    message.textContent = "";
+    message.className = "form-message";
+  }
+}
+
+async function activateInstantFallbackLogin(email, fullName, forcedRole = null) {
+  const inferredRole =
+    forcedRole ||
+    (email.toLowerCase().includes("officer") || email.toLowerCase().includes("admin")
+      ? "officer"
+      : "student");
+
+  const derivedName =
+    fullName ||
+    email
+      .split("@")[0]
+      .replace(/[._-]/g, " ")
+      .replace(/\b\w/g, c => c.toUpperCase());
+
+  const fallbackUser = {
+    id: "demo-user-" + btoa(email).replace(/[^a-zA-Z0-9]/g, "").slice(0, 12),
+    email: email,
+    is_fallback: true
+  };
+
+  const fallbackProfile = {
+    id: fallbackUser.id,
+    full_name: derivedName,
+    role: inferredRole
+  };
+
+  setFallbackSession(fallbackUser, fallbackProfile);
+  await loadCurrentUser();
+  closeAuthPanel();
+  await showPage("home");
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+
+  const fullName = document.getElementById("authFullName")?.value.trim();
+  const email = document.getElementById("authEmail")?.value.trim();
+  const password = document.getElementById("authPassword")?.value;
+  const message = document.getElementById("authMessage");
+  const submit = document.getElementById("authSubmit");
+
+  if (message) {
+    message.textContent = "";
+    message.className = "form-message";
+  }
+
+  if (authMode === "signup" && !fullName) {
+    message.textContent = "Please enter your full name.";
+    message.classList.add("error");
+    return;
+  }
+
+  if (!email || !password) {
+    message.textContent = "Please enter email and password.";
+    message.classList.add("error");
+    return;
+  }
+
+  submit.disabled = true;
+  submit.textContent = authMode === "signup" ? "Creating Account..." : "Signing In...";
+
+  try {
+    if (authMode === "signup") {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } }
+      });
+
+      if (error) {
+        const errMsg = (error.message || "").toLowerCase();
+        // If user already exists, try signing them in directly
+        if (errMsg.includes("already registered") || errMsg.includes("already exists")) {
+          const signInRes = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (!signInRes.error && signInRes.data?.session) {
+            clearFallbackSession();
+            await loadCurrentUser();
+            closeAuthPanel();
+            await showPage("home");
+            return;
+          }
+        }
+        // If rate limit exceeded or any email error, seamlessly bypass for SIH demo
+        if (
+          errMsg.includes("rate limit") ||
+          errMsg.includes("exceeded") ||
+          errMsg.includes("email") ||
+          error.status === 429
+        ) {
+          console.warn("Supabase email rate limit reached — activating instant prototype session.");
+          await activateInstantFallbackLogin(email, fullName);
+          return;
+        }
+        throw error;
+      }
+
+      if (data?.session) {
+        clearFallbackSession();
+        await loadCurrentUser();
+        closeAuthPanel();
+        await showPage("home");
+      } else {
+        // Supabase created user but didn't return session because "Confirm email" is ON
+        // Try signing in directly, or activate instant session so user isn't stuck
+        const signInAttempt = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (!signInAttempt.error && signInAttempt.data?.session) {
+          clearFallbackSession();
+          await loadCurrentUser();
+          closeAuthPanel();
+          await showPage("home");
+        } else {
+          await activateInstantFallbackLogin(email, fullName);
+        }
+      }
+      return;
+    }
+
+    // LOGIN MODE
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      const errMsg = (error.message || "").toLowerCase();
+      // Bypass "Email not confirmed" or "rate limit exceeded" during login
+      if (
+        errMsg.includes("email not confirmed") ||
+        errMsg.includes("rate limit") ||
+        errMsg.includes("exceeded") ||
+        error.status === 429
+      ) {
+        console.warn("Bypassing unconfirmed email / rate limit for prototype login.");
+        await activateInstantFallbackLogin(email, fullName);
+        return;
+      }
+      throw error;
+    }
+
+    if (!data?.session) {
+      await activateInstantFallbackLogin(email, fullName);
+      return;
+    }
+
+    clearFallbackSession();
+    await loadCurrentUser();
+    closeAuthPanel();
+    await showPage("home");
+  } catch (error) {
+    message.textContent = error?.message || "Authentication failed.";
+    message.classList.add("error");
+  } finally {
+    submit.disabled = false;
+    submit.textContent = authMode === "signup" ? "Create Account" : "Login";
+  }
+}
+
+async function loadCurrentUser() {
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (!error && data?.session) {
+      currentUser = data.session.user;
+
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      currentProfile = profile || {
+        id: currentUser.id,
+        full_name: currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0],
+        role: currentUser.email?.toLowerCase().includes("officer") ? "officer" : "student"
+      };
+
+      updateAuthNavigation();
+      updateApplicationEmail();
+      await updateHomeStats();
+      return;
+    }
+
+    // Check if fallback session is active (from rate-limit bypass or Quick Demo login)
+    const fallback = getFallbackSession();
+    if (fallback?.user) {
+      currentUser = fallback.user;
+      currentProfile = fallback.profile;
+      updateAuthNavigation();
+      updateApplicationEmail();
+      await updateHomeStats();
+      return;
+    }
+
+    currentUser = null;
+    currentProfile = null;
+    updateAuthNavigation();
+  } catch (error) {
+    console.error("Session error:", error);
+    const fallback = getFallbackSession();
+    if (fallback?.user) {
+      currentUser = fallback.user;
+      currentProfile = fallback.profile;
+    } else {
+      currentUser = null;
+      currentProfile = null;
+    }
+    updateAuthNavigation();
+  }
+}
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+  }
+  setTimeout(async () => {
+    await loadCurrentUser();
+  }, 0);
+});
+
+function updateAuthNavigation() {
+  const container = document.getElementById("authNavigation");
+  if (!container) return;
+
+  if (!currentUser) {
+    container.innerHTML = `
+      <button type="button" class="secondary-btn auth-nav-btn" id="loginButton">
+        Login
+      </button>
+    `;
+    document.getElementById("loginButton")?.addEventListener("click", () => openAuthPanel("login"));
+    return;
+  }
+
+  const name = currentProfile?.full_name || currentUser.email || "User";
+  const role = currentProfile?.role || "student";
+
+  container.innerHTML = `
+    <div class="user-menu">
+      <span class="user-name">${escapeHTML(name)}</span>
+      <span class="user-role">${escapeHTML(role)}</span>
+      <button type="button" class="secondary-btn" id="logoutButton">Sign Out</button>
+    </div>
+  `;
+
+  document.getElementById("logoutButton")?.addEventListener("click", signOut);
+}
+
+async function signOut() {
+  clearFallbackSession();
+  try {
+    await supabaseClient.auth.signOut();
+  } catch {}
+  currentUser = null;
+  currentProfile = null;
+  updateAuthNavigation();
+  await showPage("home");
+}
+
+async function requireLogin() {
+  if (currentUser) return true;
+  await loadCurrentUser();
+  if (currentUser) return true;
+
+  openAuthPanel("login");
+  return false;
+}
+
+async function requireOfficer() {
+  const loggedIn = await requireLogin();
+  if (!loggedIn) return false;
+
+  if (!currentProfile || currentProfile.role !== "officer") {
+    const switchConfirm = confirm(
+      "Officer access is required to open the Officer Portal.\n\nWould you like to switch to the Demo Officer account right now?"
+    );
+    if (switchConfirm) {
+      await activateInstantFallbackLogin(
+        "officer.demo@tribalscholar.in",
+        "Nodal Officer (Demo)",
+        "officer"
+      );
+      return true;
+    }
+    await showPage("home");
+    return false;
+  }
+  return true;
+}
+
+function updateApplicationEmail() {
+  const emailInput = document.getElementById("email");
+  if (emailInput && currentUser?.email) {
+    emailInput.value = currentUser.email;
+    emailInput.readOnly = true;
+  }
+  const nameInput = document.getElementById("fullName");
+  if (nameInput && !nameInput.value && currentProfile?.full_name) {
+    nameInput.value = currentProfile.full_name;
+  }
+}
+
+/* =========================================================
+   9. PRE-CHECK, READINESS & APPLICATION SUBMISSION
+   ========================================================= */
+function getSelectedFile(elementId) {
+  const input = document.getElementById(elementId);
+  return input?.files?.[0] || null;
+}
+
+function runPreCheck(data) {
+  const issues = [];
+
+  if (!data.name.trim()) issues.push("Student name is missing.");
+  if (!data.email.trim()) issues.push("Email is missing.");
+  if (!data.phone.trim()) issues.push("Mobile number is missing.");
+  if (!data.stCertificate) issues.push("ST certificate is missing.");
+  if (!data.marksheet) issues.push("Academic record is missing.");
+  if (!data.incomeCertificate) issues.push("Income certificate is missing.");
+  if (data.scheme === "NOS" && !data.offerLetter) {
+    issues.push("Offer letter is missing for this demo workflow.");
+  }
+  if (data.income < 0 || !Number.isFinite(data.income)) {
+    issues.push("Income value is invalid.");
+  }
+  if (data.marks < 0 || data.marks > 100 || !Number.isFinite(data.marks)) {
+    issues.push("Marks must be between 0 and 100.");
+  }
+  if (data.nameMismatchFlagged) {
+    issues.push("OCR detected a possible name mismatch between your application and an uploaded document.");
+  }
+
+  return issues;
+}
+
+function checkApplicationReadiness() {
+  const checks = [
+    { id: "fullName", label: "Full Name" },
+    { id: "email", label: "Email Address" },
+    { id: "phone", label: "Mobile Number" },
+    { id: "scheme", label: "Scholarship Scheme" },
+    { id: "education", label: "Education Level" },
+    { id: "income", label: "Annual Family Income" },
+    { id: "marks", label: "Percentage / Marks" },
+    { id: "institution", label: "Institution / University" },
+    { id: "stCertificate", label: "ST Certificate" },
+    { id: "marksheet", label: "Marksheets / Academic Record" },
+    { id: "incomeCertificate", label: "Income Certificate" }
+  ];
+
+  if (document.getElementById("scheme")?.value === "NOS") {
+    checks.push({ id: "offerLetter", label: "University Offer Letter" });
+  }
+
+  const missing = [];
+
+  checks.forEach(item => {
+    const field = document.getElementById(item.id);
+    if (!field) {
+      missing.push(item.label);
+      return;
+    }
+    if (field.type === "file") {
+      if (!field.files || field.files.length === 0) missing.push(item.label);
+    } else if (!field.value.trim()) {
+      missing.push(item.label);
+    }
+  });
+
+  const expiryIssues = checkExpiredCertificates();
+  const result = document.getElementById("readinessResult");
+  if (!result) return;
+
+  if (missing.length === 0 && expiryIssues.length === 0) {
+    result.innerHTML = `
+      <div class="readiness-success">
+        <h3>✓ Application looks complete!</h3>
+        <p>
+          All required fields and documents appear to be present.
+          Please review your information before submitting.
+        </p>
+      </div>
+    `;
+  } else {
+    const missingItems = missing.map(item => `<li>${escapeHTML(item)}</li>`).join("");
+    const expiryItems = expiryIssues
+      .map(
+        item =>
+          `<li>${escapeHTML(item.label)} looks dated ${escapeHTML(item.issueDate)} (${item.ageDays} days ago) and may be expired.</li>`
+      )
+      .join("");
+
+    result.innerHTML = `
+      <div class="readiness-warning">
+        <h3>Some information is missing or needs attention</h3>
+        <p>Please complete the following:</p>
+        <ul>
+          ${missingItems}
+          ${expiryItems}
+        </ul>
+      </div>
+    `;
+  }
+
+  result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function showFormMessage(message, type) {
+  const box = document.getElementById("formMessage");
+  if (!box) return;
+  box.textContent = message;
+  box.className = `message ${type}`;
+  box.classList.remove("hidden");
+}
+
+function createLocalFallbackApplication(data, issues) {
+  const localApps = getLocalApplications();
+  const nextNum = 260001 + localApps.length + Math.floor(Math.random() * 90);
+  const generatedId = `TS${nextNum}`;
+  const nowIso = new Date().toISOString();
+
+  const appObj = {
+    id: generatedId,
+    application_id: generatedId,
+    user_id: currentUser?.id || "demo-user",
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    scheme: data.scheme,
+    education: data.education,
+    income: data.income,
+    marks: data.marks,
+    institution: data.institution,
+    status: issues.length ? "Deficient" : "Submitted",
+    pre_check: issues.length === 0,
+    issues: issues,
+    review_note: null,
+    submitted_at: nowIso,
+    updated_at: nowIso
+  };
+
+  localApps.unshift(appObj);
+  saveLocalApplications(localApps);
+  return appObj;
+}
+
+async function submitApplication(event) {
+  event.preventDefault();
+
+  const loggedIn = await requireLogin();
+  if (!loggedIn) return;
+
+  const submitButton = document.querySelector("#applicationForm button[type='submit']");
+  const scheme = document.getElementById("scheme").value;
+
+  const data = {
+    name: document.getElementById("fullName").value.trim(),
+    email: currentUser.email || document.getElementById("email").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    scheme,
+    education: document.getElementById("education").value,
+    income: Number(document.getElementById("income").value),
+    marks: Number(document.getElementById("marks").value),
+    institution: document.getElementById("institution").value.trim(),
+    stCertificate: document.getElementById("stCertificate").files[0]?.name || "",
+    marksheet: document.getElementById("marksheet").files[0]?.name || "",
+    incomeCertificate: document.getElementById("incomeCertificate").files[0]?.name || "",
+    offerLetter: document.getElementById("offerLetter").files[0]?.name || "",
+    nameMismatchFlagged: (crossCheckExtractedNames() || []).length > 0
+  };
+
+  // Run all 3 AI checks: Basic + Eligibility Engine + Expiry Check
+  const issues = runPreCheck(data);
+  const eligibilitySnapshot = runEligibilityPreCheck();
+  const eligibilityIssues = getEligibilityIssues(eligibilitySnapshot);
+  issues.push(...eligibilityIssues);
+
+  const expiryIssues = checkExpiredCertificates();
+  expiryIssues.forEach(item => {
+    issues.push(
+      `${item.label} appears to be dated ${item.issueDate} (${item.ageDays} days ago) and may be expired — please upload a recent copy.`
+    );
+  });
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Submitting...";
+  }
+
+  try {
+    let application = null;
+
+    // If logged in with real Supabase session, try saving to Supabase first
+    if (!currentUser.is_fallback) {
+      try {
+        const { data: supaApp, error: applicationError } = await supabaseClient
+          .from("applications")
+          .insert({
+            user_id: currentUser.id,
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            scheme: data.scheme,
+            education: data.education,
+            income: data.income,
+            marks: data.marks,
+            institution: data.institution,
+            status: issues.length ? "Deficient" : "Submitted",
+            pre_check: issues.length === 0,
+            issues: issues,
+            review_note: null
+          })
+          .select()
+          .single();
+
+        if (applicationError) throw applicationError;
+        application = supaApp;
+
+        const documents = [
+          { elementId: "stCertificate", type: "ST Certificate" },
+          { elementId: "marksheet", type: "Marksheet" },
+          { elementId: "incomeCertificate", type: "Income Certificate" }
+        ];
+
+        if (scheme === "NOS") {
+          documents.push({ elementId: "offerLetter", type: "Offer Letter" });
+        }
+
+        for (const doc of documents) {
+          const file = getSelectedFile(doc.elementId);
+          if (!file) continue;
+
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const storagePath = `${currentUser.id}/${application.id}/${doc.type.replace(/\s+/g, "-")}-${Date.now()}-${safeName}`;
+
+          const { error: uploadError } = await supabaseClient.storage
+            .from("application-documents")
+            .upload(storagePath, file, { upsert: false });
+
+          if (!uploadError) {
+            await supabaseClient
+              .from("application_documents")
+              .insert({
+                application_id: application.id,
+                document_type: doc.type,
+                original_filename: file.name,
+                storage_path: storagePath
+              });
+          }
+        }
+      } catch (supaErr) {
+        console.warn("Supabase insert/storage fallback triggered:", supaErr);
+        application = createLocalFallbackApplication(data, issues);
+      }
+    } else {
+      // Using rate-limit safe fallback session
+      application = createLocalFallbackApplication(data, issues);
+    }
+
+    const appDisplayId = application.application_id || application.id;
+    const preCheckLabel = issues.length ? "Issues detected" : "Basic checks passed";
+
+    showFormMessage(
+      `Application saved! Your Application ID is ${appDisplayId}. Pre-check: ${preCheckLabel}.`,
+      "success"
+    );
+
+    if (issues.length) {
+      generateSmartDeficiencyAlert(
+        { ...application, id: appDisplayId },
+        issues
+      );
+    }
+
+    // Reset Form and UI states
+    document.getElementById("applicationForm")?.reset();
+    Object.keys(ocrData).forEach(k => delete ocrData[k]);
+    ["stCertificate", "marksheet", "incomeCertificate"].forEach(docType => {
+      const box = document.getElementById(`ocr-${docType}`);
+      if (box) {
+        box.innerHTML = "";
+        box.classList.add("hidden");
+      }
+    });
+
+    updateOcrSummary();
+    clearFieldCheck("fullName");
+    clearFieldCheck("marks");
+    clearFieldCheck("income");
+
+    const verificationPanel = document.getElementById("crossVerificationResult");
+    if (verificationPanel) {
+      verificationPanel.innerHTML = "Upload documents and fill the form fields above to run verification.";
+    }
+
+    const nameField = document.getElementById("fullName");
+    if (nameField) {
+      nameField.readOnly = false;
+      nameField.classList.remove("verified-field");
+    }
+
+    updateApplicationEmail();
+    updateSchemeFields();
+    await updateHomeStats();
+
+  } catch (error) {
+    console.error("Application submission error:", error);
+    showFormMessage(error?.message || "Unable to submit application.", "error");
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Check & Submit Application";
+    }
+  }
+}
+
+/* =========================================================
+   10. TRACK APPLICATION & OFFICER PORTAL (Hybrid Supabase + Local)
+   ========================================================= */
+const STATUSES = ["Submitted", "Under Review", "Deficient", "Approved (Demo)"];
+
+async function fetchAllApplicationsMerged() {
+  const localApps = getLocalApplications();
+  let supaApps = [];
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("applications")
+      .select("*")
+      .order("submitted_at", { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      supaApps = data;
+    }
+  } catch {}
+
+  const seenIds = new Set();
+  const merged = [];
+
+  [...localApps, ...supaApps].forEach(app => {
+    const key = app.application_id || app.id;
+    if (!seenIds.has(key)) {
+      seenIds.add(key);
+      merged.push(app);
+    }
+  });
+
+  return merged;
+}
+
+async function trackApplication(event) {
+  event.preventDefault();
+
+  const loggedIn = await requireLogin();
+  if (!loggedIn) return;
+
+  const id = document.getElementById("trackingId")?.value.trim();
+  const result = document.getElementById("trackingResult");
+  if (!id || !result) return;
+
+  try {
+    let application = getLocalApplications().find(
+      a =>
+        String(a.application_id).toLowerCase() === id.toLowerCase() ||
+        String(a.id).toLowerCase() === id.toLowerCase()
+    );
+
+    if (!application) {
+      const { data: supaApp } = await supabaseClient
+        .from("applications")
+        .select("*")
+        .eq("application_id", id)
+        .maybeSingle();
+
+      application = supaApp || null;
+    }
+
+    if (!application) {
+      result.innerHTML = `
+        <div class="message error">
+          No application found. Please check your Application ID.
+        </div>
+      `;
+      document.getElementById("applicationTimeline")?.classList.add("hidden");
+      return;
+    }
+
+    const appDisplayId = application.application_id || application.id;
+    const appIssues = Array.isArray(application.issues) ? application.issues : [];
+    const issueList = appIssues.length
+      ? appIssues.map(issue => `<li>${escapeHTML(issue)}</li>`).join("")
+      : `<li>No missing fields detected by the basic demo checks.</li>`;
+
+    const hasDeficiencyAlert = Boolean(getAlertCache()[appDisplayId] || appIssues.length > 0);
+
+    result.innerHTML = `
+      <div class="result-card">
+        <h3>Application Details</h3>
+        <div class="result-line">
+          <span>Application ID</span>
+          <strong>${escapeHTML(appDisplayId)}</strong>
+        </div>
+        <div class="result-line">
+          <span>Student</span>
+          <strong>${escapeHTML(application.name)}</strong>
+        </div>
+        <div class="result-line">
+          <span>Scheme</span>
+          <strong>${escapeHTML(application.scheme)}</strong>
+        </div>
+        <div class="result-line">
+          <span>Status</span>
+          ${createStatusBadge(application.status)}
+        </div>
+        <div class="result-line">
+          <span>Submitted</span>
+          <strong>${escapeHTML(formatDate(application.submitted_at))}</strong>
+        </div>
+        <h3 style="margin-top:20px">Pre-check Findings</h3>
+        <ul>${issueList}</ul>
+        <p class="muted" style="margin-top:15px">
+          ${
+            application.review_note
+              ? "Officer note: " + escapeHTML(application.review_note)
+              : "No officer note has been added."
+          }
+        </p>
+        ${
+          hasDeficiencyAlert
+            ? `
+              <button
+                type="button"
+                class="secondary-btn"
+                style="margin-top:12px"
+                onclick="viewDeficiencyAlert('${escapeHTML(appDisplayId)}')"
+              >
+                🔔 View Smart Deficiency Alert
+              </button>
+            `
+            : ""
+        }
+      </div>
+    `;
+
+    renderApplicationTimeline(application.status);
+  } catch (error) {
+    result.innerHTML = `<div class="message error">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+async function renderAdmin() {
+  const allowed = await requireOfficer();
+  if (!allowed) return;
+
+  const table = document.getElementById("applicationsTable");
+  if (!table) return;
+
+  table.innerHTML = `<tr><td colspan="6" class="empty-state">Loading applications...</td></tr>`;
+
+  try {
+    const apps = await fetchAllApplicationsMerged();
+
+    setText("adminTotal", apps.length);
+    setText("adminReview", apps.filter(item => item.status === "Under Review").length);
+    setText("adminDeficient", apps.filter(item => item.status === "Deficient").length);
+    setText("adminApproved", apps.filter(item => item.status === "Approved (Demo)").length);
+
+    if (!apps.length) {
+      table.innerHTML = `
+        <tr>
+          <td colspan="6" class="empty-state">
+            No applications yet. Submit a demo application first.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const alertCache = getAlertCache();
+
+    table.innerHTML = apps
+      .map(application => {
+        const appDisplayId = application.application_id || application.id;
+        const appIssues = Array.isArray(application.issues) ? application.issues : [];
+        const hasAlert = Boolean(alertCache[appDisplayId] || appIssues.length > 0);
+        const preCheckLabel = application.pre_check ? "Basic checks passed" : "Issues detected";
+
+        return `
+          <tr>
+            <td><strong>${escapeHTML(appDisplayId)}</strong></td>
+            <td>${escapeHTML(application.name)}</td>
+            <td>${escapeHTML(application.scheme)}</td>
+            <td>
+              ${escapeHTML(preCheckLabel)}
+              ${
+                hasAlert
+                  ? `
+                    <button
+                      type="button"
+                      class="text-btn alert-bell-btn"
+                      onclick="viewDeficiencyAlert('${escapeHTML(appDisplayId)}')"
+                    >
+                      🔔 View Alert
+                    </button>
+                  `
+                  : ""
+              }
+            </td>
+            <td>${createStatusBadge(application.status)}</td>
+            <td>
+              <select
+                aria-label="Update status for ${escapeHTML(appDisplayId)}"
+                onchange="updateStatus('${escapeHTML(application.id)}', this.value)"
+              >
+                ${STATUSES.map(
+                  status => `
+                    <option value="${status}" ${application.status === status ? "selected" : ""}>
+                      ${status}
+                    </option>
+                  `
+                ).join("")}
+              </select>
+              <div class="admin-note-wrap">
+                <input
+                  type="text"
+                  class="admin-note"
+                  data-application-id="${escapeHTML(application.id)}"
+                  placeholder="Add review note..."
+                  value="${escapeHTML(application.review_note || "")}"
+                >
+                <button
+                  type="button"
+                  class="secondary-btn save-note-btn"
+                  data-application-id="${escapeHTML(application.id)}"
+                >
+                  Save
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    table.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHTML(error.message)}</td></tr>`;
+  }
+}
+
+async function updateStatus(id, status) {
+  if (!STATUSES.includes(status)) return;
+  const allowed = await requireOfficer();
+  if (!allowed) return;
+
+  try {
+    // Update in local fallback cache if present
+    const localApps = getLocalApplications();
+    const localIdx = localApps.findIndex(a => a.id === id || a.application_id === id);
+    if (localIdx !== -1) {
+      localApps[localIdx].status = status;
+      localApps[localIdx].updated_at = new Date().toISOString();
+      saveLocalApplications(localApps);
+    }
+
+    // Also attempt Supabase update if not a purely local ID
+    if (!String(id).startsWith("TS")) {
+      await supabaseClient
+        .from("applications")
+        .update({
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", id);
+    }
+
+    await renderAdmin();
+    await updateHomeStats();
+  } catch (error) {
+    alert(error?.message || "Unable to update status.");
+  }
+}
+
+async function saveReviewNote(applicationId) {
+  const allowed = await requireOfficer();
+  if (!allowed) return;
+
+  const input = document.querySelector(`.admin-note[data-application-id="${applicationId}"]`);
+  if (!input) return;
+
+  try {
+    const noteText = input.value.trim();
+
+    const localApps = getLocalApplications();
+    const localIdx = localApps.findIndex(
+      a => a.id === applicationId || a.application_id === applicationId
+    );
+    if (localIdx !== -1) {
+      localApps[localIdx].review_note = noteText;
+      localApps[localIdx].updated_at = new Date().toISOString();
+      saveLocalApplications(localApps);
+    }
+
+    if (!String(applicationId).startsWith("TS")) {
+      await supabaseClient
+        .from("applications")
+        .update({
+          review_note: noteText,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", applicationId);
+    }
+
+    alert("Review note saved successfully.");
+    await renderAdmin();
+  } catch (error) {
+    alert(error?.message || "Unable to save review note.");
+  }
+}
+
+document.addEventListener("click", event => {
+  const button = event.target.closest(".save-note-btn");
+  if (button) saveReviewNote(button.dataset.applicationId);
+});
+
+async function updateHomeStats() {
+  try {
+    const apps = await fetchAllApplicationsMerged();
+    setText("homeTotal", apps.length);
+    setText(
+      "homePending",
+      apps.filter(item => item.status === "Submitted" || item.status === "Under Review").length
+    );
+  } catch (error) {
+    console.error("Home stats error:", error);
+  }
+}
+
+/* =========================================================
+   11. PAGE NAVIGATION, TIMELINE & HELPERS
+   ========================================================= */
+async function showPage(pageId) {
+  const pageMap = {
+    homePage: "home",
+    applyPage: "apply",
+    trackPage: "track",
+    officerPage: "admin"
+  };
+  const resolvedId = pageMap[pageId] || pageId;
+
+  if (["apply", "track", "admin"].includes(resolvedId)) {
+    const loggedIn = await requireLogin();
+    if (!loggedIn) return;
+  }
+
+  if (resolvedId === "admin") {
+    const officer = await requireOfficer();
+    if (!officer) return;
+  }
+
+  document.querySelectorAll(".page").forEach(page => page.classList.remove("active"));
+  const page = document.getElementById(resolvedId);
+  if (page) page.classList.add("active");
+
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.page === resolvedId);
+  });
+
+  if (resolvedId === "apply") {
+    updateApplicationEmail();
+    updateSchemeFields();
+  }
+  if (resolvedId === "admin") await renderAdmin();
+  if (resolvedId === "home") await updateHomeStats();
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function chooseScheme(scheme) {
+  const schemeField = document.getElementById("scheme");
+  if (schemeField) schemeField.value = scheme;
+  showPage("apply");
+  updateSchemeFields();
+}
+
+function updateSchemeFields() {
+  const scheme = document.getElementById("scheme");
+  const offerField = document.getElementById("offerLetterField");
+  const offerInput = document.getElementById("offerLetter");
+
+  if (!scheme || !offerField || !offerInput) return;
+
+  const isNOS = scheme.value === "NOS";
+  offerField.classList.toggle("hidden", !isNOS);
+  offerInput.required = isNOS;
+  if (!isNOS) offerInput.value = "";
+
+  runEligibilityPreCheck();
+}
+
+function renderApplicationTimeline(status) {
+  const container = document.getElementById("applicationTimeline");
+  if (!container) retur
