@@ -21,11 +21,10 @@
 
   const $ = id => document.getElementById(id);
   const DEVANAGARI = /[ऀ-ॿ]/;
-  const HINGLISH_WORDS = [
-    "kya", "kaise", "kaisa", "kab", "kahan", "kyu", "kyun", "hai", "hain", "mujhe", "mera", "meri",
-    "karna", "karu", "karun", "chahiye", "batao", "bataiye", "paisa", "paise", "milega", "nahi",
-    "aavedan", "avedan", "yojana", "chhatravritti", "dastavez", "shikayat", "kitna", "kaun", "kaunse", "kaunsa", "kaunsi", "liye", "aur", "bhi", "sakta", "sakti", "milegi"
-  ];
+
+  /* All language knowledge lives in js/assistant-i18n.js + js/kb/*.js.
+     Fall back gracefully if the i18n core failed to load. */
+  const I18N = window.AssistantI18n || null;
 
   const LANG_KEY = "tribalScholarAssistantLang";
   const sessionId = "chat-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -51,17 +50,20 @@
     } catch {}
   }
 
-  function isHinglish(text) {
-    const words = text.toLowerCase().match(/[a-z]+/g) || [];
-    return words.filter(w => HINGLISH_WORDS.includes(w)).length >= 2;
-  }
-
-  /* 'en' | 'hi' — for the offline KB and the UI. The AI itself is told to
-     mirror the student's script (so Hinglish gets a Hinglish reply). */
+  /* A language code ('en', 'hi', 'ta', …) for the offline guide and the UI.
+     The AI itself is told to mirror the student's language/script. */
   function detectLang(text) {
     const pref = getLangPref();
+    if (I18N) return I18N.detect(text, pref);
     if (pref === "en" || pref === "hi") return pref;
-    return DEVANAGARI.test(text) || isHinglish(text) ? "hi" : "en";
+    return DEVANAGARI.test(text) ? "hi" : "en";
+  }
+
+  /* BCP-47 code for speech synthesis / recognition for a given language. */
+  function speechCode(code) {
+    if (!I18N) return code === "hi" ? "hi-IN" : "en-IN";
+    const info = I18N.info(code);
+    return info.speech || info.voiceFallback || "en-IN";
   }
 
   /* ---------------------------------------------------------
@@ -92,158 +94,100 @@
   }
 
   /* ---------------------------------------------------------
-     OFFLINE HINDI KNOWLEDGE BASE (English lives in STUDY_BUDDY_KB)
+     OFFLINE MULTILINGUAL KNOWLEDGE BASE
+     Every language's built-in guide lives in js/kb/<code>.js and is served
+     through AssistantI18n. If the i18n core is missing we fall back to the
+     English STUDY_BUDDY_KB defined in script.js.
      --------------------------------------------------------- */
-  const HINDI_KB = [
-    {
-      id: "greeting",
-      keywords: ["नमस्ते", "नमस्कार", "हेलो", "namaste", "namaskar"],
-      answer: "नमस्ते! मैं स्टडी बडी 🎓 हूँ। मैं NFST / NOS योजना, ज़रूरी दस्तावेज़, पात्रता, आवेदन और स्टेटस ट्रैक करने में आपकी मदद कर सकता हूँ। आप क्या जानना चाहते हैं?"
-    },
-    {
-      id: "schemes",
-      keywords: ["योजना", "योजनाएं", "छात्रवृत्ति", "स्कॉलरशिप", "yojana", "chhatravritti", "scholarship kaun", "kaun si scholarship"],
-      answer: "TribalScholar पर अभी दो योजनाएं हैं:\n\n• NFST — अनुसूचित जनजाति के छात्रों के लिए राष्ट्रीय फेलोशिप (भारत में PhD / शोध के लिए)\n• NOS — राष्ट्रीय प्रवासी छात्रवृत्ति (विदेश में मास्टर्स / PhD के लिए, विश्वविद्यालय का ऑफ़र लेटर ज़रूरी)\n\nकिसी एक के बारे में पूछिए, जैसे \"NFST क्या है\"।"
-    },
-    {
-      id: "nfst",
-      keywords: ["nfst", "फेलोशिप", "fellowship", "राष्ट्रीय फेलोशिप"],
-      answer: "NFST — अनुसूचित जनजाति छात्रों के लिए राष्ट्रीय फेलोशिप:\n• भारत में PhD / शोध के लिए\n• ज़रूरी दस्तावेज़: ST प्रमाणपत्र, मार्कशीट, आय प्रमाणपत्र\n• प्रोटोटाइप नियम: अंक ≥ 55%, पारिवारिक वार्षिक आय ≤ ₹8,00,000\n\nये डेमो के नियम हैं — आधिकारिक दिशानिर्देश ज़रूर देखें।"
-    },
-    {
-      id: "nos",
-      keywords: ["nos", "विदेश", "प्रवासी", "overseas", "videsh", "abroad"],
-      answer: "NOS — राष्ट्रीय प्रवासी छात्रवृत्ति:\n• विदेश में मास्टर्स या PhD के लिए\n• ज़रूरी दस्तावेज़: ST प्रमाणपत्र, मार्कशीट, आय प्रमाणपत्र और विश्वविद्यालय का ऑफ़र लेटर\n• प्रोटोटाइप नियम: अंक ≥ 60%, पारिवारिक वार्षिक आय ≤ ₹8,00,000"
-    },
-    {
-      id: "eligibility",
-      keywords: ["पात्रता", "योग्यता", "पात्र", "eligible", "patrata", "yogyata", "kaun apply", "आय सीमा"],
-      answer: "पात्रता (प्रोटोटाइप नियम) योजना पर निर्भर है:\n• NFST: PhD/शोध स्तर, अंक ≥ 55%, आय ≤ ₹8,00,000\n• NOS: मास्टर्स या PhD, अंक ≥ 60%, आय ≤ ₹8,00,000, ऑफ़र लेटर ज़रूरी\n\nApply पेज पर फ़ॉर्म भरते ही AI पात्रता जाँच तुरंत पास / फ़ेल दिखाती है।"
-    },
-    {
-      id: "documents",
-      keywords: ["दस्तावेज़", "दस्तावेज", "कागज़", "प्रमाणपत्र", "dastavez", "documents chahiye", "kaunse documents", "certificate", "upload"],
-      answer: "आपको ये दस्तावेज़ चाहिए:\n• ST प्रमाणपत्र\n• मार्कशीट / शैक्षणिक रिकॉर्ड\n• आय प्रमाणपत्र\n• विश्वविद्यालय ऑफ़र लेटर (सिर्फ़ NOS के लिए)\n\nआप फ़ोटो अपलोड कर सकते हैं या \"DigiLocker से लाएं\" बटन से सीधे जारीकर्ता से सत्यापित दस्तावेज़ ले सकते हैं। धुंधली फ़ोटो होने पर पोर्टल आपको दोबारा फ़ोटो लेने को कहेगा।"
-    },
-    {
-      id: "apply",
-      keywords: ["आवेदन", "अप्लाई", "कैसे करें", "kaise apply", "apply kaise", "aavedan", "avedan", "form kaise"],
-      answer: "आवेदन 4 चरणों में:\n1. लॉगिन करें और योजना चुनें\n2. व्यक्तिगत, शैक्षणिक और आय की जानकारी भरें\n3. दस्तावेज़ अपलोड करें या DigiLocker से लाएं\n4. \"Check My Application\" से जाँचें, कमियाँ ठीक करें, फिर सबमिट करें"
-    },
-    {
-      id: "track",
-      keywords: ["स्टेटस", "ट्रैक", "स्थिति", "status", "track", "kahan tak", "application id"],
-      answer: "\"Track Application\" टैब खोलें और अपना Application ID (जैसे TS260001) डालें। आपको वर्तमान स्थिति — Submitted, Under Review, Deficient या Approved — और टाइमलाइन दिखेगी।"
-    },
-    {
-      id: "deficient",
-      keywords: ["कमी", "त्रुटि", "deficient", "galti", "kami", "सुधार"],
-      answer: "\"Deficient\" का मतलब है कि जाँच में कोई कमी मिली — कोई जानकारी छूट गई, फ़ॉर्म और दस्तावेज़ में अंतर है, या प्रमाणपत्र पुराना लग रहा है। अपना आवेदन ट्रैक करें और 🔔 बटन से पूरी सूचना देखें।"
-    },
-    {
-      id: "payments",
-      keywords: ["पैसा", "भुगतान", "राशि", "डीबीटी", "paisa", "paise", "kab milega", "payment", "dbt", "pfms", "बैंक"],
-      answer: "आवेदन स्वीकृत होने के बाद भुगतान 4 चरणों से गुज़रता है:\n1. स्वीकृत (Sanctioned)\n2. भुगतान शुरू (PFMS को भेजा गया)\n3. DBT प्रोसेस हुआ\n4. बैंक खाते में जमा\n\n\"Payments\" टैब में लाइव स्थिति और रेफ़रेंस नंबर देखें। ध्यान दें: आपका बैंक खाता आधार से जुड़ा (NPCI सीडिंग) होना चाहिए।"
-    },
-    {
-      id: "grievance",
-      keywords: ["शिकायत", "समस्या", "shikayat", "complaint", "grievance", "problem"],
-      answer: "शिकायत दर्ज करने के लिए \"Grievance\" टैब खोलें, श्रेणी चुनें और समस्या लिखें। आपको टिकट ID मिलेगी, शिकायत सही विभाग को भेजी जाएगी और आप उसका समाधान ट्रैक कर सकते हैं।"
-    },
-    {
-      id: "digilocker",
-      keywords: ["डिजिलॉकर", "digilocker", "आधार", "aadhaar", "ekyc"],
-      answer: "Apply पेज पर \"Fetch via DigiLocker\" दबाएं, अनुमति दें और अपने DigiLocker में जारी ST, आय और मार्कशीट दस्तावेज़ चुनें। ये सीधे जारी करने वाले विभाग से आते हैं, इसलिए सत्यापित माने जाते हैं और फ़ॉर्म अपने आप भर जाता है।"
-    },
-    {
-      id: "contact",
-      keywords: ["संपर्क", "हेल्पलाइन", "sampark", "helpline", "contact"],
-      answer: "यह छात्रों द्वारा बनाया गया प्रोटोटाइप है, इसलिए यहाँ कोई लाइव हेल्पलाइन नहीं है। आधिकारिक सवालों के लिए अपनी योजना की हेल्पडेस्क या राज्य नोडल कार्यालय से संपर्क करें।"
-    }
-  ];
-
-  const HINDI_FALLBACK =
-    "माफ़ कीजिए, इसका जवाब मुझे अभी नहीं पता। मैं योजनाओं (NFST/NOS), दस्तावेज़, पात्रता, आवेदन, स्टेटस, भुगतान और शिकायत के बारे में मदद कर सकता हूँ। नीचे दिए विषयों में से कोई चुनें।";
-
-  function kbAnswer(query, lang) {
-    const q = query.toLowerCase().trim();
-    const pick = (kb, fallback) => {
-      let best = null;
-      let bestScore = 0;
-      kb.forEach(entry => {
-        let score = 0;
-        entry.keywords.forEach(k => {
-          const hit = DEVANAGARI.test(k) ? q.includes(k.toLowerCase()) : studyBuddyKeywordMatches(q, k);
-          if (hit) score += k.split(" ").length;
-        });
-        if (score > bestScore) {
-          bestScore = score;
-          best = entry;
-        }
+  function kbAnswer(query, lang, topic) {
+    if (I18N) return I18N.answer(query, lang, topic);
+    // Fallback: English-only keyword match against script.js's STUDY_BUDDY_KB.
+    const q = String(query).toLowerCase().trim();
+    let best = null;
+    let bestScore = 0;
+    (typeof STUDY_BUDDY_KB !== "undefined" ? STUDY_BUDDY_KB : []).forEach(entry => {
+      let score = 0;
+      entry.keywords.forEach(k => {
+        if (studyBuddyKeywordMatches(q, k)) score += k.split(" ").length;
       });
-      return best ? best.answer : fallback;
-    };
-    return lang === "hi"
-      ? pick(HINDI_KB, HINDI_FALLBACK)
-      : pick(STUDY_BUDDY_KB, typeof STUDY_BUDDY_FALLBACK === "string" ? STUDY_BUDDY_FALLBACK : "Sorry, I don't know that yet.");
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry;
+      }
+    });
+    return best ? best.answer : (typeof STUDY_BUDDY_FALLBACK === "string" ? STUDY_BUDDY_FALLBACK : "Sorry, I don't know that yet.");
   }
 
   /* ---------------------------------------------------------
-     QUICK TOPICS + GREETING (per language)
+     QUICK TOPICS + GREETING (per language, from the language pack)
      --------------------------------------------------------- */
-  const QUICK = {
-    en: [
-      ["NFST vs NOS", "What is the difference between NFST and NOS?"],
-      ["Documents needed", "What documents do I need to upload?"],
-      ["Eligibility", "What are the eligibility criteria?"],
-      ["How to apply", "How do I apply?"],
-      ["Payment status", "When will I get my scholarship money?"],
-      ["Raise complaint", "How do I raise a grievance?"]
-    ],
-    hi: [
-      ["योजनाएं", "कौन सी छात्रवृत्ति योजनाएं हैं?"],
-      ["ज़रूरी दस्तावेज़", "मुझे कौन से दस्तावेज़ चाहिए?"],
-      ["पात्रता", "पात्रता क्या है?"],
-      ["आवेदन कैसे करें", "आवेदन कैसे करें?"],
-      ["पैसा कब मिलेगा", "छात्रवृत्ति का पैसा कब मिलेगा?"],
-      ["शिकायत", "शिकायत कैसे दर्ज करें?"]
-    ]
-  };
+  const QUICK_FALLBACK = [
+    ["NFST vs NOS", "schemes"],
+    ["Documents needed", "documents"],
+    ["Eligibility", "eligibility"],
+    ["How to apply", "apply"],
+    ["Payment status", "payments"],
+    ["Raise complaint", "grievance"]
+  ];
 
-  const GREETING = {
-    en: "Hi! I'm Study Buddy 🎓 Ask me in English or हिंदी about NFST/NOS, documents, eligibility, applying, payments or complaints. You can also tap 🎤 and speak.",
-    hi: "नमस्ते! मैं स्टडी बडी 🎓 हूँ। NFST/NOS, दस्तावेज़, पात्रता, आवेदन, भुगतान या शिकायत के बारे में हिंदी या English में पूछिए। आप 🎤 दबाकर बोलकर भी पूछ सकते हैं।"
-  };
+  /* [label, topicId] pairs for the current UI language. */
+  function quickTopics(lang) {
+    const pack = I18N ? I18N.pack(lang) || I18N.pack("en") : null;
+    return (pack && pack.quick) || QUICK_FALLBACK;
+  }
 
+  function greetingText(lang) {
+    const pack = I18N ? I18N.pack(lang) || I18N.pack("en") : null;
+    return (pack && pack.greeting) ||
+      "Hi! I'm Study Buddy 🎓 Ask me about NFST/NOS, documents, eligibility, applying, payments or complaints.";
+  }
+
+  function placeholderText(lang) {
+    const pack = I18N ? I18N.pack(lang) || I18N.pack("en") : null;
+    return (pack && pack.placeholder) || "Ask a question…";
+  }
+
+  function privacyText(lang) {
+    const pack = I18N ? I18N.pack(lang) || I18N.pack("en") : null;
+    return (pack && pack.privacy) ||
+      "🔒 For your safety I removed personal numbers (Aadhaar / phone / account) before answering. Please don't share them in chat.";
+  }
+
+  /* The language used for the UI (greeting, chips, placeholder): the pinned
+     language, or English while "auto" is selected. */
   function uiLang() {
     const pref = getLangPref();
-    return pref === "hi" ? "hi" : "en";
+    if (pref && pref !== "auto") return pref;
+    return I18N && I18N.pageLang ? (I18N.pageLang() || "en") : "en";
   }
 
   function renderQuickReplies() {
     const wrap = $("studyBuddyQuickReplies");
     if (!wrap) return;
-    wrap.innerHTML = QUICK[uiLang()]
-      .map(([label, query]) => `<button type="button" class="study-buddy-chip" data-ai-query="${escapeHTML(query)}">${escapeHTML(label)}</button>`)
+    wrap.innerHTML = quickTopics(uiLang())
+      .map(([label, topic]) => `<button type="button" class="study-buddy-chip" data-ai-topic="${escapeHTML(topic)}" data-ai-label="${escapeHTML(label)}">${escapeHTML(label)}</button>`)
       .join("");
   }
 
-  /* Up to 2 local follow-up chips after an answer (the next topics in QUICK,
-     skipping the one just asked). Built with textContent — no innerHTML. */
-  function showFollowUps(askedQuery, lang) {
+  /* Up to 2 local follow-up chips after an answer (the next topics for this
+     language, skipping the one just asked). Built with textContent. */
+  function showFollowUps(askedTopic, lang) {
     const box = $("studyBuddyMessages");
     if (!box) return;
     box.querySelectorAll(".sb-followups").forEach(el => el.remove());
-    const list = QUICK[lang] || QUICK.en;
-    const asked = list.findIndex(([, q]) => q === askedQuery);
-    const picks = [1, 2].map(n => list[(asked + n + list.length) % list.length]).filter(([, q]) => q !== askedQuery);
+    const list = quickTopics(lang);
+    const asked = list.findIndex(([, topic]) => topic === askedTopic);
+    const picks = [1, 2]
+      .map(n => list[(asked + n + list.length) % list.length])
+      .filter(([, topic]) => topic !== askedTopic);
     const wrap = document.createElement("div");
     wrap.className = "sb-followups";
-    picks.slice(0, 2).forEach(([label, query]) => {
+    picks.slice(0, 2).forEach(([label, topic]) => {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "study-buddy-chip";
-      chip.dataset.aiQuery = query;
+      chip.dataset.aiTopic = topic;
+      chip.dataset.aiLabel = label;
       chip.textContent = label;
       wrap.appendChild(chip);
     });
@@ -252,7 +196,7 @@
   }
 
   function greeting() {
-    addBotMessage(GREETING[uiLang()], "kb");
+    addBotMessage(greetingText(uiLang()), "kb");
   }
 
   /* ---------------------------------------------------------
@@ -278,7 +222,7 @@
     if (!box) return;
     const bubble = document.createElement("div");
     bubble.className = "study-buddy-msg bot";
-    bubble.lang = DEVANAGARI.test(text) ? "hi" : "en";
+    bubble.lang = I18N ? I18N.detectScript(text, uiLang()) : (DEVANAGARI.test(text) ? "hi" : "en");
 
     const body = document.createElement("div");
     body.textContent = text;
@@ -318,8 +262,11 @@
 
   function readAloud(text) {
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[•✨📘🎓]/g, ""));
-    u.lang = DEVANAGARI.test(text) ? "hi-IN" : "en-IN";
+    const u = new SpeechSynthesisUtterance(text.replace(/[•✨📘🎓🔔🔊🎤🔒]/g, ""));
+    /* Match the voice to the language of the text (script-based), so a Tamil
+       or Telugu answer is read with the right engine when available. */
+    const lang = I18N ? I18N.detectScript(text, uiLang()) : (DEVANAGARI.test(text) ? "hi" : "en");
+    u.lang = speechCode(lang);
     u.rate = 0.95;
     window.speechSynthesis.speak(u);
   }
@@ -379,8 +326,9 @@
 
   let busy = false;
 
-  /* local = true for quick-reply chips: answer from the built-in guide only. */
-  async function handle(rawQuery, { local = false } = {}) {
+  /* Quick-reply / follow-up chips pass a topic id and answer from the built-in
+     guide only (local = true, zero AI tokens). Free-text goes through the AI. */
+  async function handle(rawQuery, { local = false, topic = null } = {}) {
     const query = String(rawQuery || "").trim();
     if (!query || busy) return;
     busy = true;
@@ -393,21 +341,16 @@
     let answer = local ? null : await askAI(safeText, lang);
     let source = "ai";
     if (!answer) {
-      answer = kbAnswer(query, lang);
+      answer = kbAnswer(query, lang, topic);
       source = "kb";
     }
 
     typing?.remove();
     if (changed) {
-      addBotMessage(
-        lang === "hi"
-          ? "🔒 आपकी निजी जानकारी (जैसे आधार / फ़ोन / खाता नंबर) सुरक्षा के लिए हटा दी गई है। कृपया चैट में ये नंबर न लिखें।"
-          : "🔒 For your safety I removed personal numbers (Aadhaar / phone / account) before answering. Please don't share them in chat.",
-        "kb"
-      );
+      addBotMessage(privacyText(lang), "kb");
     }
     addBotMessage(answer, source);
-    showFollowUps(query, lang);
+    showFollowUps(topic || (I18N ? I18N.matchTopic(query, lang) : null), lang);
 
     history.push({ role: "user", content: safeText }, { role: "assistant", content: answer });
     if (history.length > 20) history.splice(0, history.length - 20);
@@ -449,16 +392,26 @@
       select.id = "sbLang";
       select.className = "sb-lang";
       select.setAttribute("aria-label", "Assistant language");
-      select.innerHTML = `
-        <option value="auto">Auto</option>
-        <option value="en">English</option>
-        <option value="hi">हिंदी</option>`;
+      /* "Auto" plus every language declared in AssistantI18n. Languages that
+         have a built-in guide pack are marked so; the rest still work via the
+         live AI and script detection. */
+      let options = '<option value="auto">Auto</option>';
+      if (I18N && Array.isArray(I18N.LANGS)) {
+        options += I18N.LANGS.map(l => {
+          const hasPack = !!I18N.pack(l.code);
+          const label = hasPack ? l.name : `${l.name} (AI)`;
+          return `<option value="${l.code}">${label}</option>`;
+        }).join("");
+      } else {
+        options += '<option value="en">English</option><option value="hi">हिंदी</option>';
+      }
+      select.innerHTML = options;
       select.value = getLangPref();
       select.addEventListener("change", () => {
         setLangPref(select.value);
         renderQuickReplies();
         const input = $("studyBuddyInput");
-        if (input) input.placeholder = uiLang() === "hi" ? "अपना सवाल लिखें…" : "Ask a question…";
+        if (input) input.placeholder = placeholderText(uiLang());
       });
       header.insertBefore(select, header.querySelector(".study-buddy-close"));
     }
@@ -474,7 +427,8 @@
       mic.textContent = "🎤";
       mic.addEventListener("click", () => {
         const rec = new Recognition();
-        rec.lang = getLangPref() === "en" ? "en-IN" : "hi-IN";
+        const pref = getLangPref();
+        rec.lang = speechCode(pref !== "auto" ? pref : uiLang());
         rec.interimResults = false;
         rec.maxAlternatives = 1;
         mic.classList.add("listening");
@@ -494,8 +448,15 @@
   }
 
   document.addEventListener("click", event => {
-    const chip = event.target.closest("[data-ai-query]");
-    if (chip) handle(chip.dataset.aiQuery, { local: true });
+    const chip = event.target.closest("[data-ai-topic], [data-ai-query]");
+    if (!chip) return;
+    if (chip.dataset.aiTopic) {
+      // Quick-reply / follow-up chip: answer this topic from the built-in guide.
+      const label = chip.dataset.aiLabel || chip.textContent.trim();
+      handle(label, { local: true, topic: chip.dataset.aiTopic });
+    } else if (chip.dataset.aiQuery) {
+      handle(chip.dataset.aiQuery, { local: true });
+    }
   });
 
   document.addEventListener("DOMContentLoaded", enhancePanel);

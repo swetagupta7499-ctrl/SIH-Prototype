@@ -885,6 +885,20 @@
   <script src="js/data-service.js"></script>
   <script src="js/ocr-preprocess.js"></script>
   <script src="js/gov-integrations.js"></script>
+
+  <!-- Study Buddy multilingual core + per-language built-in guide packs.
+       assistant-i18n.js MUST load before the kb/*.js packs, and all of them
+       before ai-assistant.js. -->
+  <script src="js/assistant-i18n.js"></script>
+  <script src="js/kb/en.js"></script>
+  <script src="js/kb/hi.js"></script>
+  <script src="js/kb/bn.js"></script>
+  <script src="js/kb/mr.js"></script>
+  <script src="js/kb/te.js"></script>
+  <script src="js/kb/ta.js"></script>
+  <script src="js/kb/gu.js"></script>
+  <script src="js/kb/ur.js"></script>
+
   <script src="js/ai-assistant.js"></script>
 
   <!-- Aadhaar Secure QR: jsQR decodes the QR, the aadhaar-qr Edge Function
