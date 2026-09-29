@@ -1,0 +1,16 @@
+# Only the settings this repo needs. Link to the hosted project with:
+#   supabase link --project-ref uieigcolfhexqqqmzydk
+project_id = "uieigcolfhexqqqmzydk"
+
+# Called from the public site with the publishable key (not a user JWT),
+# including by demo sessions, so JWT verification is off. Abuse protection
+# lives in the functions: input limits, per-IP rate limit, ALLOWED_ORIGINS,
+# and no secrets are ever returned to the browser.
+[functions.ai-assistant]
+verify_jwt = false
+
+[functions.gov-gateway]
+verify_jwt = false
+
+[functions.aadhaar-qr]
+verify_jwt = false
