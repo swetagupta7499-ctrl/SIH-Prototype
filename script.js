@@ -8,8 +8,8 @@
 /* =========================================================
    1. SUPABASE CONFIGURATION
    ========================================================= */
-const SUPABASE_URL = "https://pzhvbysnrcsumivvvlfx.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8rAdF0TNelKSQc_MdeKVOA_7EBvDdtt";
+const SUPABASE_URL = "https://uieigcolfhexqqqmzydk.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_zy7ToyexAbIKxEsbwYmkKw_nA7ReHgD";
 
 if (!window.supabase) {
   throw new Error("Supabase JS library failed to load. Check index.html.");
@@ -111,10 +111,26 @@ async function handleDocumentOCR(inputEl, docType, displayName) {
     </div>
   `;
 
+  // A new upload replaces any DigiLocker document attached to this field.
+  if (window.digiLockerDocs?.[docType]) delete window.digiLockerDocs[docType];
+
   try {
-    const source = file.type === "application/pdf"
+    const rawSource = file.type === "application/pdf"
       ? await pdfFirstPageToImage(file)
       : file;
+
+    // Image pre-processing: blur/exposure check + auto-contrast before OCR
+    let source = rawSource;
+    let prepared = null;
+    if (window.OcrPreprocess) {
+      box.innerHTML = `<div class="ocr-loading">🪄 Checking image quality &amp; enhancing ${escapeHTML(displayName)}…</div>`;
+      try {
+        prepared = await OcrPreprocess.prepare(rawSource);
+        source = prepared.dataUrl;
+      } catch (prepError) {
+        console.warn("Pre-processing skipped:", prepError);
+      }
+    }
 
     const { data } = await Tesseract.recognize(source, "eng", {
       logger: (m) => {
@@ -131,10 +147,11 @@ async function handleDocumentOCR(inputEl, docType, displayName) {
     const fields = extractStructuredFields(data.text, docType);
     ocrData[docType] = {
       ...fields,
-      confidence: Math.round(data.confidence)
+      confidence: Math.round(data.confidence),
+      quality: prepared?.quality || null
     };
 
-    renderOcrBox(docType, displayName, ocrData[docType]);
+    renderOcrBox(docType, displayName, ocrData[docType], prepared?.previews);
     updateOcrSummary();
     runCrossVerification();
     runEligibilityPreCheck();
@@ -188,12 +205,12 @@ function extractStructuredFields(rawText, docType) {
   return fields;
 }
 
-function renderOcrBox(docType, displayName, fields) {
+function renderOcrBox(docType, displayName, fields, previews) {
   const box = document.getElementById(`ocr-${docType}`);
   if (!box) return;
 
   const rows = Object.entries(fields)
-    .filter(([key]) => key !== "confidence")
+    .filter(([key]) => !["confidence", "quality", "source"].includes(key))
     .map(([key, value]) => `
       <div class="ocr-field-row">
         <span>${formatFieldLabel(key)}</span>
@@ -207,6 +224,7 @@ function renderOcrBox(docType, displayName, fields) {
       <div class="ocr-result-header">
         <span>✓ ${escapeHTML(displayName)} — OCR ${fields.confidence}% confidence</span>
       </div>
+      ${window.OcrPreprocess ? OcrPreprocess.qualityHtml(fields.quality, previews) : ""}
       ${rows}
     </div>
   `;
@@ -275,6 +293,13 @@ function updateOcrSummary() {
         <td>${f.name ? escapeHTML(f.name) : "—"}</td>
         <td>${escapeHTML(f.certificateNumber || f.issueDate || "—")}</td>
         <td>${f.confidence}%</td>
+        <td>${
+          f.source === "DigiLocker"
+            ? "Issuer-verified"
+            : f.quality
+              ? `<span class="quality-chip ${escapeHTML(f.quality.level)}">${f.quality.score}/100</span>`
+              : "—"
+        }</td>
       </tr>
     `;
   }).join("");
@@ -303,6 +328,7 @@ function updateOcrSummary() {
           <th>Name (OCR)</th>
           <th>Cert No. / Date</th>
           <th>Confidence</th>
+          <th>Image Quality</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -519,6 +545,9 @@ function getNumber(id) {
 }
 
 function getDocumentStatus(documentKey) {
+  const fromDigiLocker = window.digiLockerDocs?.[documentKey];
+  if (fromDigiLocker) return { uploaded: true, name: fromDigiLocker.name };
+
   const input = document.getElementById(documentKey);
   if (!input) return { uploaded: false, name: "" };
   const uploaded = input.files && input.files.length > 0;
@@ -782,6 +811,13 @@ function closeDeficiencyAlertModal() {
   document.getElementById("deficiencyAlertModal")?.classList.add("hidden");
 }
 
+/* Match a row by its TS… application_id or its uuid id. Comparing a TS… value
+   against the uuid column makes Postgres reject the whole query. */
+function applicationIdFilter(appId) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(appId));
+  return isUuid ? `application_id.eq.${appId},id.eq.${appId}` : `application_id.eq.${appId}`;
+}
+
 async function viewDeficiencyAlert(appId) {
   const cache = getAlertCache();
   if (cache[appId]) {
@@ -807,7 +843,7 @@ async function viewDeficiencyAlert(appId) {
     const { data: app } = await supabaseClient
       .from("applications")
       .select("*")
-      .or(`application_id.eq.${appId},id.eq.${appId}`)
+      .or(applicationIdFilter(appId))
       .maybeSingle();
 
     if (app && Array.isArray(app.issues) && app.issues.length) {
@@ -819,10 +855,8 @@ async function viewDeficiencyAlert(appId) {
 }
 
 /* =========================================================
-   7. IDENTITY VERIFICATION (eKYC + DigiLocker Demo)
+   7. IDENTITY VERIFICATION (Aadhaar Secure QR + DigiLocker)
    ========================================================= */
-const IDENTITY_API_BASE = "http://localhost:4000/api";
-let aadhaarTxnId = null;
 let identityVerified = false;
 
 function setIdentityStatus(message, type) {
@@ -833,97 +867,14 @@ function setIdentityStatus(message, type) {
   box.classList.remove("hidden");
 }
 
+// Aadhaar Secure QR scan → UIDAI signature check lives in js/aadhaar-qr.js
 function openAadhaarModal() {
-  document.getElementById("aadhaarModal")?.classList.remove("hidden");
+  window.AadhaarQr?.open();
 }
 
-function closeAadhaarModal() {
-  document.getElementById("aadhaarModal")?.classList.add("hidden");
-  document.getElementById("aadhaarStep1")?.classList.remove("hidden");
-  document.getElementById("aadhaarStep2")?.classList.add("hidden");
-}
-
-async function requestAadhaarOtp() {
-  const idNumber = document.getElementById("aadhaarNumber")?.value.trim();
-  if (!idNumber) {
-    alert("Please enter your 12-digit number.");
-    return;
-  }
-
-  try {
-    const res = await fetch(`${IDENTITY_API_BASE}/aadhaar/generate-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aadhaarNumber: idNumber })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    aadhaarTxnId = data.txnId;
-    document.getElementById("aadhaarStep1")?.classList.add("hidden");
-    document.getElementById("aadhaarStep2")?.classList.remove("hidden");
-  } catch (err) {
-    if (err.name === "TypeError") {
-      aadhaarTxnId = "DEMO-TXN";
-      document.getElementById("aadhaarStep1")?.classList.add("hidden");
-      document.getElementById("aadhaarStep2")?.classList.remove("hidden");
-    } else {
-      alert(err.message);
-    }
-  }
-}
-
-async function verifyAadhaarOtp() {
-  const otp = document.getElementById("aadhaarOtp")?.value.trim();
-  if (!otp) {
-    alert("Please enter the OTP.");
-    return;
-  }
-
-  try {
-    const res = await fetch(`${IDENTITY_API_BASE}/aadhaar/verify-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ txnId: aadhaarTxnId, otp })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    applyVerifiedIdentity(data);
-    closeAadhaarModal();
-    setIdentityStatus(
-      `✓ Identity verified (Ref: ${data.aadhaarRef}). Name and details auto-filled below.`,
-      "success"
-    );
-  } catch (err) {
-    if (err.name === "TypeError") {
-      const fallbackName =
-        currentProfile?.full_name ||
-        document.getElementById("fullName")?.value.trim() ||
-        "Verified Student";
-      applyVerifiedIdentity({ name: fallbackName });
-      closeAadhaarModal();
-      setIdentityStatus(
-        "✓ Identity verified in Demo Mode. Name and details auto-filled below.",
-        "success"
-      );
-    } else {
-      alert(err.message);
-    }
-  }
-}
-
-async function startDigiLockerVerification() {
-  try {
-    const res = await fetch(`${IDENTITY_API_BASE}/digilocker/authorize`);
-    const data = await res.json();
-    window.location.href = data.authorizeUrl;
-  } catch {
-    setIdentityStatus(
-      "✓ DigiLocker Demo Mode connected — 3 documents verified (ST Certificate, Marksheet, Income Certificate).",
-      "success"
-    );
-  }
+// DigiLocker consent → sign-in → document picker lives in js/gov-integrations.js
+function startDigiLockerVerification() {
+  window.GovIntegrations?.DigiLocker.start();
 }
 
 function applyVerifiedIdentity(identity) {
@@ -938,24 +889,6 @@ function applyVerifiedIdentity(identity) {
   runCrossVerification();
   runEligibilityPreCheck();
 }
-
-(function checkDigiLockerReturn() {
-  const params = new URLSearchParams(window.location.search);
-  const state = params.get("digilocker_state");
-  if (!state) return;
-
-  fetch(`${IDENTITY_API_BASE}/digilocker/session/${state}`)
-    .then(res => res.json())
-    .then(session => {
-      if (session.documents) {
-        setIdentityStatus(
-          `✓ DigiLocker connected — ${session.documents.items.length} documents fetched (ST Certificate, Marksheet, Income Certificate).`,
-          "success"
-        );
-      }
-    })
-    .catch(() => {});
-})();
 
 /* =========================================================
    8. SUPABASE AUTHENTICATION & AUTO RATE-LIMIT BYPASS
@@ -1433,17 +1366,20 @@ function checkApplicationReadiness() {
       return;
     }
     if (field.type === "file") {
-      if (!field.files || field.files.length === 0) missing.push(item.label);
+      if (!getDocumentStatus(item.id).uploaded) missing.push(item.label);
     } else if (!field.value.trim()) {
       missing.push(item.label);
     }
   });
 
   const expiryIssues = checkExpiredCertificates();
+  const qualityIssues = Object.entries(ocrData)
+    .filter(([, f]) => f.quality?.isBlurry)
+    .map(([docType, f]) => `${formatFieldLabel(docType)} photo is blurry (quality ${f.quality.score}/100) — retake it so the officer can read it.`);
   const result = document.getElementById("readinessResult");
   if (!result) return;
 
-  if (missing.length === 0 && expiryIssues.length === 0) {
+  if (missing.length === 0 && expiryIssues.length === 0 && qualityIssues.length === 0) {
     result.innerHTML = `
       <div class="readiness-success">
         <h3>✓ Application looks complete!</h3>
@@ -1461,6 +1397,7 @@ function checkApplicationReadiness() {
           `<li>${escapeHTML(item.label)} looks dated ${escapeHTML(item.issueDate)} (${item.ageDays} days ago) and may be expired.</li>`
       )
       .join("");
+    const qualityItems = qualityIssues.map(item => `<li>${escapeHTML(item)}</li>`).join("");
 
     result.innerHTML = `
       <div class="readiness-warning">
@@ -1469,6 +1406,7 @@ function checkApplicationReadiness() {
         <ul>
           ${missingItems}
           ${expiryItems}
+          ${qualityItems}
         </ul>
       </div>
     `;
@@ -1534,9 +1472,9 @@ async function submitApplication(event) {
     income: Number(document.getElementById("income").value),
     marks: Number(document.getElementById("marks").value),
     institution: document.getElementById("institution").value.trim(),
-    stCertificate: document.getElementById("stCertificate").files[0]?.name || "",
-    marksheet: document.getElementById("marksheet").files[0]?.name || "",
-    incomeCertificate: document.getElementById("incomeCertificate").files[0]?.name || "",
+    stCertificate: getDocumentStatus("stCertificate").name,
+    marksheet: getDocumentStatus("marksheet").name,
+    incomeCertificate: getDocumentStatus("incomeCertificate").name,
     offerLetter: document.getElementById("offerLetter").files[0]?.name || "",
     nameMismatchFlagged: (crossCheckExtractedNames() || []).length > 0
   };
@@ -1598,7 +1536,34 @@ async function submitApplication(event) {
           documents.push({ elementId: "offerLetter", type: "Offer Letter" });
         }
 
+        // Insert a document row with OCR quality metadata; falls back to the
+        // original columns if the features migration hasn't been applied yet.
+        const insertDocumentRow = async (row, extra) => {
+          const { error } = await supabaseClient
+            .from("application_documents")
+            .insert({ ...row, ...extra });
+          if (error) {
+            await supabaseClient.from("application_documents").insert(row);
+          }
+        };
+
         for (const doc of documents) {
+          const ocr = ocrData[doc.elementId];
+          const digiDoc = window.digiLockerDocs?.[doc.elementId];
+
+          if (digiDoc) {
+            await insertDocumentRow(
+              {
+                application_id: application.id,
+                document_type: doc.type,
+                original_filename: digiDoc.name,
+                storage_path: `digilocker://${digiDoc.uri}`
+              },
+              { source: "digilocker", issuer: digiDoc.issuer, ocr_confidence: 100 }
+            );
+            continue;
+          }
+
           const file = getSelectedFile(doc.elementId);
           if (!file) continue;
 
@@ -1610,14 +1575,19 @@ async function submitApplication(event) {
             .upload(storagePath, file, { upsert: false });
 
           if (!uploadError) {
-            await supabaseClient
-              .from("application_documents")
-              .insert({
+            await insertDocumentRow(
+              {
                 application_id: application.id,
                 document_type: doc.type,
                 original_filename: file.name,
                 storage_path: storagePath
-              });
+              },
+              {
+                source: "upload",
+                ocr_confidence: ocr?.confidence ?? null,
+                image_quality: ocr?.quality || null
+              }
+            );
           }
         }
       } catch (supaErr) {
@@ -2729,10 +2699,14 @@ function toggleStudyBuddy() {
   if (willOpen && !studyBuddyOpened) {
     studyBuddyOpened = true;
     renderStudyBuddyQuickReplies();
-    addStudyBuddyMessage(
-      "bot",
-      "Hi! I'm Study Buddy 🎓 Ask me anything about NFST/NOS, documents, eligibility, applying, tracking status, or general study tips."
-    );
+    if (window.StudyBuddyAI) {
+      StudyBuddyAI.greeting();
+    } else {
+      addStudyBuddyMessage(
+        "bot",
+        "Hi! I'm Study Buddy 🎓 Ask me anything about NFST/NOS, documents, eligibility, applying, tracking status, or general study tips."
+      );
+    }
   }
 
   if (willOpen) {
@@ -2741,6 +2715,8 @@ function toggleStudyBuddy() {
 }
 
 function renderStudyBuddyQuickReplies() {
+  if (window.StudyBuddyAI) return StudyBuddyAI.renderQuickReplies();
+
   const wrap = document.getElementById("studyBuddyQuickReplies");
   if (!wrap) return;
 
@@ -2795,6 +2771,9 @@ function findStudyBuddyAnswer(rawQuery) {
 }
 
 function handleStudyBuddySend(rawQuery) {
+  // Multilingual AI assistant (js/ai-assistant.js) takes over when loaded
+  if (window.StudyBuddyAI) return StudyBuddyAI.handle(rawQuery);
+
   const query = rawQuery.trim();
   if (!query) return;
 
@@ -2861,9 +2840,6 @@ window.chooseScheme = chooseScheme;
 window.updateSchemeFields = updateSchemeFields;
 window.handleDocumentOCR = handleDocumentOCR;
 window.openAadhaarModal = openAadhaarModal;
-window.closeAadhaarModal = closeAadhaarModal;
-window.requestAadhaarOtp = requestAadhaarOtp;
-window.verifyAadhaarOtp = verifyAadhaarOtp;
 window.startDigiLockerVerification = startDigiLockerVerification;
 window.checkApplicationReadiness = checkApplicationReadiness;
 window.viewDeficiencyAlert = viewDeficiencyAlert;
@@ -2926,7 +2902,7 @@ async function findApplicationById(appId) {
     const { data } = await supabaseClient
       .from("applications")
       .select("*")
-      .or(`application_id.eq.${appId},id.eq.${appId}`)
+      .or(applicationIdFilter(appId))
       .maybeSingle();
     return data || null;
   } catch {
@@ -3089,7 +3065,7 @@ async function handleTicketReupload(event) {
         review_note: `Student re-uploaded ${docType} (${file.name}) via Ticket Hub.`,
         updated_at: new Date().toISOString()
       })
-      .or(`application_id.eq.${activeTicketAppId},id.eq.${activeTicketAppId}`);
+      .or(applicationIdFilter(activeTicketAppId));
   } catch {}
 
   addTicketMessage(
@@ -3207,6 +3183,12 @@ window.handleTicketReupload = handleTicketReupload;
   }
   function writeStore(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+    // Mirror to Supabase for real sessions (js/data-service.js); no-op in demo mode
+    window.DataService?.mirror(key, value);
+  }
+
+  async function pullStore(key) {
+    if (window.DataService) await DataService.pull(key);
   }
 
   const $ = id => document.getElementById(id);
@@ -3373,6 +3355,7 @@ window.handleTicketReupload = handleTicketReupload;
           <div class="fx-amount">${inr(p.amount)}${stageBadge(p.stage)}</div>
         </div>
         ${stepperHtml(steps, p.stage)}
+        ${window.GovIntegrations ? GovIntegrations.PFMS.cardHtml(p, officerView) : ""}
         <details class="fx-details">
           <summary>Transaction history &amp; reference numbers</summary>
           <ul class="fx-history">${historyRows}</ul>
@@ -3386,6 +3369,7 @@ window.handleTicketReupload = handleTicketReupload;
     if (!box) return;
     box.innerHTML = `<div class="panel muted">Loading payments…</div>`;
 
+    await pullStore(PAYMENTS_KEY);
     const all = await fetchAllApplicationsMerged();
     let pays = syncPayments(all);
     const officerView = isOfficer();
@@ -3407,7 +3391,10 @@ window.handleTicketReupload = handleTicketReupload;
       </div>`;
 
     const intro = officerView
-      ? `<p class="muted">Officer view: move each sanctioned payment forward through the DBT pipeline. Students see updates instantly.</p>`
+      ? `<div class="fx-intro-row">
+           <p class="muted">Officer view: move each sanctioned payment forward through the DBT pipeline, or pull the latest status from PFMS. Students see updates instantly.</p>
+           ${pays.some(p => p.stage < 3) ? `<button type="button" class="secondary-btn" data-fx-action="pfms-sync-all">🔄 Sync all with PFMS</button>` : ""}
+         </div>`
       : `<p class="muted">Track every sanctioned scholarship payment from sanction to bank credit. Payments appear here once an application is approved.</p>`;
 
     const cards = pays.length
@@ -3671,6 +3658,7 @@ window.handleTicketReupload = handleTicketReupload;
   }
 
   async function renderGrievance() {
+    await pullStore(GRIEVANCE_KEY);
     const cat = $("grvCategory");
     if (cat) {
       const prev = cat.value;
@@ -3788,6 +3776,7 @@ window.handleTicketReupload = handleTicketReupload;
     if (!box) return;
     box.innerHTML = `<div class="panel muted">Loading your wallet…</div>`;
 
+    await Promise.all([pullStore(PAYMENTS_KEY), pullStore(GRIEVANCE_KEY)]);
     const all = await fetchAllApplicationsMerged();
     const allPays = syncPayments(all);
     const apps = all.filter(isMine).sort((a, b) => timeOf(b.submitted_at) - timeOf(a.submitted_at));
@@ -3995,6 +3984,13 @@ window.handleTicketReupload = handleTicketReupload;
   $("grvCategory")?.addEventListener("change", updateRoutingPreview);
   $("grvPriority")?.addEventListener("change", e => { e.target.dataset.touched = "1"; });
   $("grvSearch")?.addEventListener("input", renderGrievanceList);
+
+  // Hooks for js/gov-integrations.js (PFMS sync)
+  window.TSFeatures = {
+    readPayments: () => readStore(PAYMENTS_KEY),
+    writePayments: pays => writeStore(PAYMENTS_KEY, pays),
+    renderPayments
+  };
 
   // Teach Study Buddy about the new features
   if (typeof STUDY_BUDDY_KB !== "undefined") {

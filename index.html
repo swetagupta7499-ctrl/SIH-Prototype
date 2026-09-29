@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TribalScholar | Scholarship Portal</title>
   <link rel="stylesheet" href="style.css">
-  <!-- NEW: Wallet · DBT Tracker · Grievance styles -->
+  <!-- AI assistant · OCR quality · DigiLocker · PFMS · service status styles -->
   <link rel="stylesheet" href="features.css">
 
   <!-- AI-POWERED OCR ENGINE — libraries -->
@@ -313,30 +313,55 @@
           <div id="identityStatus" class="identity-status hidden"></div>
 
           <div class="notice">
-            <strong>Prototype notice:</strong> Identity verification runs in demo
-            mode (OTP: <code>123456</code>) — real eKYC requires an official
-            license. DigiLocker uses a simulated consent screen until
-            real partner credentials are configured.
+            <strong>How verification works:</strong> Aadhaar is checked by verifying
+            UIDAI's digital signature on your Aadhaar Secure QR — real and tamper-proof,
+            no OTP needed. DigiLocker runs in <strong>sandbox</strong> mode (clearly
+            labelled) until DigiLocker partner credentials are configured on the
+            gov-gateway service; it then switches to the live consent flow.
           </div>
         </div>
 
-        <!-- Identity OTP modal -->
-        <div id="aadhaarModal" class="modal hidden">
-          <div class="modal-box">
-            <h3>Identity Verification</h3>
-            <div id="aadhaarStep1">
-              <label>12-Digit ID Number
-                <input id="aadhaarNumber" maxlength="12" placeholder="Enter 12-digit ID number">
+        <!-- Aadhaar Secure QR modal (js/aadhaar-qr.js) -->
+        <div id="aadhaarModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="aadhaarModalTitle">
+          <div class="modal-box aqr-box">
+            <h3 id="aadhaarModalTitle">Verify with Aadhaar Secure QR</h3>
+            <p class="muted small">
+              Scan the large QR code on your Aadhaar letter, e-Aadhaar PDF, PVC card
+              or the mAadhaar app. We check UIDAI's digital signature on it — no OTP,
+              and your full Aadhaar number is never read or stored.
+            </p>
+
+            <div class="aqr-actions">
+              <button type="button" class="primary-btn" id="aqrCameraBtn">📷 Scan with camera</button>
+              <label class="secondary-btn aqr-upload">
+                📄 Upload e-Aadhaar PDF / photo
+                <input type="file" id="aqrFile" accept="image/*,application/pdf" hidden>
               </label>
-              <button type="button" class="primary-btn" onclick="requestAadhaarOtp()">Send OTP</button>
             </div>
-            <div id="aadhaarStep2" class="hidden">
-              <label>Enter OTP
-                <input id="aadhaarOtp" maxlength="6" placeholder="6-digit OTP">
-              </label>
-              <button type="button" class="primary-btn" onclick="verifyAadhaarOtp()">Verify</button>
+
+            <div id="aqrCamera" class="aqr-camera hidden">
+              <video id="aqrVideo" playsinline muted></video>
+              <div class="aqr-frame" aria-hidden="true"></div>
             </div>
-            <button type="button" class="text-btn" onclick="closeAadhaarModal()">Cancel</button>
+
+            <label id="aqrPasswordRow" class="hidden">e-Aadhaar PDF password
+              <input id="aqrPassword" type="password" autocomplete="off"
+                placeholder="First 4 letters of name in CAPITALS + birth year, e.g. RAME2003">
+            </label>
+            <button type="button" id="aqrPasswordBtn" class="primary-btn hidden">Open PDF</button>
+
+            <div id="aqrStatus" class="aqr-status hidden" role="status" aria-live="polite"></div>
+
+            <details class="aqr-help">
+              <summary>Where do I find the Secure QR?</summary>
+              <ul>
+                <li>e-Aadhaar: download from <strong>myaadhaar.uidai.gov.in</strong> → upload the PDF here.</li>
+                <li>mAadhaar app: open your profile and show the QR code to the camera.</li>
+                <li>Aadhaar letter / PVC card: use the big QR code (not a small old one).</li>
+              </ul>
+            </details>
+
+            <button type="button" class="text-btn" id="aqrCancel">Cancel</button>
           </div>
         </div>
 
@@ -685,6 +710,18 @@
         </div>
       </div>
 
+      <!-- INTEGRATED SERVICES STATUS -->
+      <div class="panel" id="integrationStatusPanel">
+        <span class="eyebrow">DATA &amp; SERVICES</span>
+        <h2>Integrated Services</h2>
+        <p class="muted">
+          Live connection status of the database, AI assistant and government
+          integrations. Sandbox services return simulated data and are labelled
+          as such everywhere they appear.
+        </p>
+        <div id="integrationStatus" class="svc-grid"></div>
+      </div>
+
       <!-- AI PRIORITY QUEUE -->
       <div class="panel" id="priorityQueuePanel">
         <span class="eyebrow">AI PRIORITY QUEUE</span>
@@ -842,5 +879,17 @@
 
   <!-- NEW: Wallet · DBT Tracker · Grievance (must load AFTER script.js) -->
   <script src="features.js"></script>
+
+  <!-- Data service · OCR pre-processing · DigiLocker/PFMS · multilingual AI
+       (load AFTER script.js, in this order) -->
+  <script src="js/data-service.js"></script>
+  <script src="js/ocr-preprocess.js"></script>
+  <script src="js/gov-integrations.js"></script>
+  <script src="js/ai-assistant.js"></script>
+
+  <!-- Aadhaar Secure QR: jsQR decodes the QR, the aadhaar-qr Edge Function
+       verifies UIDAI's signature -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="js/aadhaar-qr.js"></script>
 </body>
 </html>
