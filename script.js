@@ -165,27 +165,124 @@ async function handleDocumentOCR(inputEl, docType, displayName) {
   }
 }
 
+/* --- OCR text helpers: tolerate the noise Tesseract introduces ---------- */
+
+const OCR_MONTHS = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+  january: 1, february: 2, march: 3, april: 4, june: 6, july: 7,
+  august: 8, september: 9, october: 10, november: 11, december: 12
+};
+
+/* Clean common OCR mistakes so labels and separators match reliably:
+   ';' misread for ':', stray spaces around separators, O/o -> 0 inside
+   digit runs, l/I -> 1 inside digit runs. */
+function normalizeOcrText(raw) {
+  let t = String(raw || "").replace(/\s+/g, " ").trim();
+  t = t.replace(/;/g, ":");
+  // Join spaced-out numeric dates: "15 / 08 / 2003" -> "15/08/2003",
+  // "15 08 2003" -> "15/08/2003".
+  t = t.replace(/\b(\d{1,2})\s*([\/\-.])\s*(\d{1,2})\s*\2\s*(\d{2,4})\b/g, "$1$2$3$2$4");
+  t = t.replace(/\b(\d{1,2})\s+(\d{1,2})\s+(\d{4})\b/g, "$1/$2/$3");
+  return t;
+}
+
+/* Turn any recognised date string into DD/MM/YYYY (best effort). */
+function normalizeDate(str) {
+  if (!str) return null;
+  const s = str.trim().replace(/(\d)(st|nd|rd|th)\b/gi, "$1");
+
+  // ISO: YYYY-MM-DD
+  let m = s.match(/\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/);
+  if (m) return pad2(m[3]) + "/" + pad2(m[2]) + "/" + m[1];
+
+  // Numeric: DD/MM/YYYY or DD-MM-YY
+  m = s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
+  if (m) return pad2(m[1]) + "/" + pad2(m[2]) + "/" + fullYear(m[3]);
+
+  // "12 Jan 2005" / "12-Jan-2005"
+  m = s.match(/\b(\d{1,2})[\s\-]([A-Za-z]{3,9})[\s\-](\d{2,4})\b/);
+  if (m && OCR_MONTHS[m[2].toLowerCase()]) {
+    return pad2(m[1]) + "/" + pad2(OCR_MONTHS[m[2].toLowerCase()]) + "/" + fullYear(m[3]);
+  }
+
+  // "January 12, 2005" / "Jan 12 2005"
+  m = s.match(/\b([A-Za-z]{3,9})[\s.]+(\d{1,2}),?\s+(\d{2,4})\b/);
+  if (m && OCR_MONTHS[m[1].toLowerCase()]) {
+    return pad2(m[2]) + "/" + pad2(OCR_MONTHS[m[1].toLowerCase()]) + "/" + fullYear(m[3]);
+  }
+  return null;
+}
+
+function pad2(n) {
+  return String(parseInt(n, 10)).padStart(2, "0");
+}
+
+function fullYear(y) {
+  const n = parseInt(y, 10);
+  if (String(y).length <= 2) return String(n < 30 ? 2000 + n : 1900 + n);
+  return String(n);
+}
+
+/* Any date token (numeric, month-name or ISO) plus its position in `text`. */
+const ANY_DATE_SOURCE =
+  "(\\d{1,2}(?:st|nd|rd|th)?[\\/\\-.\\s]\\d{1,2}[\\/\\-.\\s]\\d{2,4}" +
+  "|\\d{4}[\\/\\-.]\\d{1,2}[\\/\\-.]\\d{1,2}" +
+  "|\\d{1,2}(?:st|nd|rd|th)?[\\s\\-][A-Za-z]{3,9}[\\s\\-,]+\\d{2,4}" +
+  "|[A-Za-z]{3,9}[\\s.]+\\d{1,2},?\\s+\\d{2,4})";
+
+/* First date that follows any of the given label words. Returns the raw match
+   and its index so the issue date can avoid re-using the DOB. */
+function findLabeledDate(text, labels) {
+  const re = new RegExp(
+    "(?:" + labels.join("|") + ")\\s*[:\\-]?\\s*" + ANY_DATE_SOURCE,
+    "i"
+  );
+  const m = text.match(re);
+  if (!m) return null;
+  return { raw: m[1], index: m.index };
+}
+
 function extractStructuredFields(rawText, docType) {
-  const text = rawText.replace(/\s+/g, " ").trim();
+  const text = normalizeOcrText(rawText);
 
   const nameMatch = text.match(
-    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|Date|Roll|$))/i
+    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|D\.O\.B|Date|Born|Roll|Caste|$))/i
   );
-  const dobMatch = text.match(
-    /(?:DOB|Date of Birth)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i
-  );
+
+  // Date of birth — accept many label spellings and date styles.
+  const dobHit = findLabeledDate(text, [
+    "D\\.?O\\.?B\\.?", "Date\\s*of\\s*Birth", "Birth\\s*Date", "Born\\s*on", "Born"
+  ]);
+  const dob = dobHit ? normalizeDate(dobHit.raw) : null;
+
+  // Issue date — its own labels; never fall back to the DOB token.
+  const issueHit = findLabeledDate(text, [
+    "Issue\\s*Date", "Date\\s*of\\s*Issue", "Issued\\s*on", "Issued", "Dated", "Date"
+  ]);
+  let issueDate = null;
+  if (issueHit && (!dobHit || issueHit.index !== dobHit.index)) {
+    issueDate = normalizeDate(issueHit.raw);
+  }
+  // Last resort: any date that is not the DOB.
+  if (!issueDate) {
+    const re = new RegExp(ANY_DATE_SOURCE, "gi");
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const d = normalizeDate(m[1]);
+      if (d && d !== dob) { issueDate = d; break; }
+    }
+  }
+
   const certNoMatch = text.match(
-    /(?:Certificate\s*No\.?|Cert\.?\s*No\.?|Registration\s*No\.?|Serial\s*No\.?)\s*[:\-]?\s*([A-Za-z0-9\/\-]{4,20})/i
-  );
-  const anyDateMatch = text.match(
-    /\b(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\b/
+    /(?:Certificate\s*No\.?|Cert\.?\s*No\.?|Registration\s*No\.?|Serial\s*No\.?|Ref(?:erence)?\s*No\.?)\s*[:\-]?\s*([A-Za-z0-9\/\-]{4,20})/i
   );
 
   const fields = {
-    name: nameMatch ? nameMatch[1].trim() : null,
-    dateOfBirth: dobMatch ? dobMatch[1] : null,
+    name: nameMatch ? nameMatch[1].trim().replace(/\s{2,}/g, " ") : null,
+    dateOfBirth: dob,
     certificateNumber: certNoMatch ? certNoMatch[1] : null,
-    issueDate: anyDateMatch ? anyDateMatch[1] : null
+    issueDate
   };
 
   if (docType === "marksheet") {
@@ -197,7 +294,7 @@ function extractStructuredFields(rawText, docType) {
 
   if (docType === "incomeCertificate") {
     const incomeMatch = text.match(
-      /(?:Annual\s*Income|Income)\s*[:\-]?\s*(?:Rs\.?|₹)?\s*([\d,]{4,10})/i
+      /(?:Annual\s*(?:Family\s*)?Income|Total\s*Income|Income)\s*(?:is|:|\-|of)?\s*(?:Rs\.?|₹|INR)?\s*([\d,]{4,12})/i
     );
     fields.annualIncome = incomeMatch ? incomeMatch[1].replace(/,/g, "") : null;
   }
