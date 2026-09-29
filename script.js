@@ -286,10 +286,53 @@ function extractStructuredFields(rawText, docType) {
   };
 
   if (docType === "marksheet") {
-    const pctMatch = text.match(/(\d{1,3}(?:\.\d{1,2})?)\s*%/);
-    const marksMatch = text.match(/(\d{2,4})\s*\/\s*(\d{2,4})/);
-    fields.percentage = pctMatch ? parseFloat(pctMatch[1]) : null;
-    fields.marksObtained = marksMatch ? `${marksMatch[1]}/${marksMatch[2]}` : null;
+    // Percentage: prefer a value anchored to a label, else any NN.NN% token,
+    // else "Percentage 78.5" without a % sign. Reject impossible values.
+    let percentage = null;
+    const pctLabeled = text.match(
+      /(?:Percentage(?:\s*of\s*Marks)?|Overall\s*Percentage|Aggregate|Result|Total)\s*(?:of\s*Marks)?\s*[:\-]?\s*(\d{1,3}(?:\.\d{1,3})?)\s*%?/i
+    );
+    const pctSign = text.match(/(\d{1,3}(?:\.\d{1,3})?)\s*%/);
+    const pctCand = pctLabeled ? pctLabeled[1] : (pctSign ? pctSign[1] : null);
+    if (pctCand !== null) {
+      const v = parseFloat(pctCand);
+      if (v > 0 && v <= 100) percentage = v;
+    }
+
+    // CGPA / GPA (e.g. "CGPA : 8.6" or "GPA 9.2/10").
+    let cgpa = null;
+    const cgpaMatch = text.match(/(?:CGPA|GPA|Grade\s*Point(?:\s*Average)?)\s*[:\-]?\s*(\d{1,2}(?:\.\d{1,2})?)(?:\s*\/\s*10)?/i);
+    if (cgpaMatch) {
+      const g = parseFloat(cgpaMatch[1]);
+      if (g > 0 && g <= 10) cgpa = g;
+    }
+    // If no percentage but we have a 10-point CGPA, offer the common ×9.5 estimate.
+    if (percentage === null && cgpa !== null) {
+      percentage = Math.round(cgpa * 9.5 * 100) / 100;
+    }
+
+    // Marks obtained X/Y — prefer a label, and reject date-like pairs
+    // (e.g. day/month) by requiring the total to look like a marks total.
+    let marksObtained = null;
+    const marksLabeled = text.match(/(?:Total(?:\s*Marks)?|Marks\s*Obtained|Grand\s*Total|Obtained)\s*[:\-]?\s*(\d{2,4})\s*\/\s*(\d{2,4})/i);
+    const marksAny = text.match(/\b(\d{2,4})\s*\/\s*(\d{2,4})\b/);
+    const pick = marksLabeled || marksAny;
+    if (pick) {
+      const got = parseInt(pick[1], 10);
+      const outOf = parseInt(pick[2], 10);
+      // Plausible marks: out-of is a round-ish total >= obtained, not a year.
+      if (outOf >= got && outOf >= 50 && outOf <= 5000 && !(outOf > 1900 && outOf < 2100)) {
+        marksObtained = `${got}/${outOf}`;
+        if (percentage === null) {
+          const p = Math.round((got / outOf) * 10000) / 100;
+          if (p > 0 && p <= 100) percentage = p;
+        }
+      }
+    }
+
+    fields.percentage = percentage;
+    fields.cgpa = cgpa;
+    fields.marksObtained = marksObtained;
   }
 
   if (docType === "incomeCertificate") {
