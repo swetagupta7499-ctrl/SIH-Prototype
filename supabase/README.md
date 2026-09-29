@@ -21,8 +21,10 @@ supabase link --project-ref uieigcolfhexqqqmzydk
 # 1. Database tables + security policies
 supabase db push
 
-# 2. AI assistant — free key from https://aistudio.google.com/apikey
-supabase secrets set GEMINI_API_KEY=your-key-here
+# 2. AI assistant — free keys from https://aistudio.google.com/apikey
+#    One or more keys (comma-separated). When a key runs out of quota or is
+#    invalid, the function switches to the next one automatically.
+supabase secrets set GEMINI_API_KEYS="key1,key2,key3"
 # optional: lock the function to your site(s)
 supabase secrets set ALLOWED_ORIGINS=https://your-site.example,http://localhost:8765
 supabase functions deploy ai-assistant --no-verify-jwt
