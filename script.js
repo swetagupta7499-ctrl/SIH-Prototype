@@ -148,7 +148,8 @@ async function handleDocumentOCR(inputEl, docType, displayName) {
     ocrData[docType] = {
       ...fields,
       confidence: Math.round(data.confidence),
-      quality: prepared?.quality || null
+      quality: prepared?.quality || null,
+      rawText: data.text || ""
     };
 
     renderOcrBox(docType, displayName, ocrData[docType], prepared?.previews);
@@ -246,17 +247,31 @@ function findLabeledDate(text, labels) {
 function extractStructuredFields(rawText, docType) {
   const text = normalizeOcrText(rawText);
 
+  // --- Name: labelled first, then a fallback for an all-caps name line. ---
+  let name = null;
   const nameMatch = text.match(
-    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|D\.O\.B|Date|Born|Roll|Caste|$))/i
+    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant|Holder))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|D\.O\.B|Date|Born|Roll|Caste|Reg|$))/i
   );
+  if (nameMatch) {
+    name = nameMatch[1];
+  } else {
+    // Fallback: scan all-caps word groups (typical printed names) and take the
+    // first that is not an obvious header/keyword line.
+    const STOP = /(BOARD|CERTIFICATE|MARKSHEET|MARK SHEET|GOVERNMENT|EXAMINATION|SECONDARY|SENIOR|HIGHER|UNIVERSITY|COUNCIL|EDUCATION|SCHOOL|COLLEGE|RESULT|STATEMENT|INCOME|CASTE|TRIBE|SCHEDULED|DIVISION|PASS|INDIA|STATE|DEPARTMENT|OFFICE)/;
+    const re = /\b([A-Z][A-Z]+(?:\s+[A-Z][A-Z.]+){1,3})\b/g;
+    let mm;
+    while ((mm = re.exec(text)) !== null) {
+      if (!STOP.test(mm[1])) { name = mm[1]; break; }
+    }
+  }
 
-  // Date of birth — accept many label spellings and date styles.
+  // --- Date of birth — many label spellings and date styles. ---
   const dobHit = findLabeledDate(text, [
-    "D\\.?O\\.?B\\.?", "Date\\s*of\\s*Birth", "Birth\\s*Date", "Born\\s*on", "Born"
+    "D\\.?\\s*O\\.?\\s*B\\.?", "Date\\s*of\\s*Birth", "Birth\\s*Date", "Born\\s*on", "Born"
   ]);
   const dob = dobHit ? normalizeDate(dobHit.raw) : null;
 
-  // Issue date — its own labels; never fall back to the DOB token.
+  // --- Issue date — its own labels; never reuse the DOB token. ---
   const issueHit = findLabeledDate(text, [
     "Issue\\s*Date", "Date\\s*of\\s*Issue", "Issued\\s*on", "Issued", "Dated", "Date"
   ]);
@@ -264,7 +279,6 @@ function extractStructuredFields(rawText, docType) {
   if (issueHit && (!dobHit || issueHit.index !== dobHit.index)) {
     issueDate = normalizeDate(issueHit.raw);
   }
-  // Last resort: any date that is not the DOB.
   if (!issueDate) {
     const re = new RegExp(ANY_DATE_SOURCE, "gi");
     let m;
@@ -273,14 +287,22 @@ function extractStructuredFields(rawText, docType) {
       if (d && d !== dob) { issueDate = d; break; }
     }
   }
+  // If DOB label was missing but exactly one date exists, treat it as DOB.
+  let dobFinal = dob;
+  if (!dobFinal) {
+    const all = (text.match(new RegExp(ANY_DATE_SOURCE, "gi")) || [])
+      .map(normalizeDate).filter(Boolean);
+    if (all.length === 1) dobFinal = all[0];
+  }
 
+  // --- Certificate / registration / roll number. ---
   const certNoMatch = text.match(
-    /(?:Certificate\s*No\.?|Cert\.?\s*No\.?|Registration\s*No\.?|Serial\s*No\.?|Ref(?:erence)?\s*No\.?)\s*[:\-]?\s*([A-Za-z0-9\/\-]{4,20})/i
+    /(?:Certificate\s*No\.?|Cert\.?\s*No\.?|Registration\s*No\.?|Regn?\.?\s*No\.?|Serial\s*No\.?|Roll\s*(?:No\.?|Number)?|Ref(?:erence)?\s*No\.?|Enrol(?:l?ment)?\s*No\.?)\s*[:\-]?\s*([A-Za-z0-9\/\-]{4,20})/i
   );
 
   const fields = {
-    name: nameMatch ? nameMatch[1].trim().replace(/\s{2,}/g, " ") : null,
-    dateOfBirth: dob,
+    name: name ? name.trim().replace(/\s{2,}/g, " ") : null,
+    dateOfBirth: dobFinal,
     certificateNumber: certNoMatch ? certNoMatch[1] : null,
     issueDate
   };
@@ -350,7 +372,8 @@ function renderOcrBox(docType, displayName, fields, previews) {
   if (!box) return;
 
   const rows = Object.entries(fields)
-    .filter(([key]) => !["confidence", "quality", "source"].includes(key))
+    .filter(([key]) => !["confidence", "quality", "source", "rawText"].includes(key))
+    .filter(([key, value]) => !(key === "cgpa" && (value === null || value === undefined)))
     .map(([key, value]) => `
       <div class="ocr-field-row">
         <span>${formatFieldLabel(key)}</span>
@@ -359,6 +382,15 @@ function renderOcrBox(docType, displayName, fields, previews) {
     `)
     .join("");
 
+  // Raw OCR text: lets the student (and support) see exactly what was read,
+  // which is invaluable when a field is missed.
+  const raw = (fields.rawText || "").trim();
+  const rawPanel = raw ? `
+    <details class="ocr-rawtext">
+      <summary>Show text read from document</summary>
+      <pre>${escapeHTML(raw)}</pre>
+    </details>` : "";
+
   box.innerHTML = `
     <div class="ocr-result-card">
       <div class="ocr-result-header">
@@ -366,6 +398,7 @@ function renderOcrBox(docType, displayName, fields, previews) {
       </div>
       ${window.OcrPreprocess ? OcrPreprocess.qualityHtml(fields.quality, previews) : ""}
       ${rows}
+      ${rawPanel}
     </div>
   `;
 }
