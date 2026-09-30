@@ -418,25 +418,65 @@
 
     const form = $("studyBuddyForm");
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (form && Recognition && !$("sbMic")) {
+    if (form && !$("sbMic")) {
       const mic = document.createElement("button");
       mic.type = "button";
       mic.id = "sbMic";
       mic.className = "sb-mic";
       mic.setAttribute("aria-label", "Speak your question");
+      mic.title = "Speak your question";
       mic.textContent = "🎤";
-      mic.addEventListener("click", () => {
-        const rec = new Recognition();
-        const pref = getLangPref();
-        rec.lang = speechCode(pref !== "auto" ? pref : uiLang());
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-        mic.classList.add("listening");
-        rec.onresult = e => handle(e.results[0][0].transcript);
-        rec.onend = () => mic.classList.remove("listening");
-        rec.onerror = () => mic.classList.remove("listening");
-        rec.start();
-      });
+
+      if (!Recognition) {
+        // No Web Speech API (e.g. Firefox, non-HTTPS): show the icon but
+        // explain instead of failing silently.
+        mic.classList.add("unsupported");
+        mic.addEventListener("click", () => {
+          addBotMessage(
+            uiLang() === "hi"
+              ? "🎤 माफ़ कीजिए, आपका ब्राउज़र वॉइस इनपुट सपोर्ट नहीं करता। कृपया Chrome या Edge (HTTPS पर) आज़माएँ, या अपना सवाल टाइप करें।"
+              : "🎤 Sorry, your browser doesn't support voice input. Please try Chrome or Edge (over HTTPS), or type your question.",
+            "kb"
+          );
+        });
+      } else {
+        mic.addEventListener("click", () => {
+          let rec;
+          try {
+            rec = new Recognition();
+          } catch (e) {
+            mic.classList.remove("listening");
+            addBotMessage(
+              uiLang() === "hi" ? "🎤 वॉइस इनपुट शुरू नहीं हो सका।" : "🎤 Couldn't start voice input.",
+              "kb"
+            );
+            return;
+          }
+          const pref = getLangPref();
+          rec.lang = speechCode(pref !== "auto" ? pref : uiLang());
+          rec.interimResults = false;
+          rec.maxAlternatives = 1;
+          mic.classList.add("listening");
+          rec.onresult = e => handle(e.results[0][0].transcript);
+          rec.onend = () => mic.classList.remove("listening");
+          rec.onerror = ev => {
+            mic.classList.remove("listening");
+            const msg = ev && ev.error === "not-allowed"
+              ? (uiLang() === "hi"
+                  ? "🎤 माइक्रोफ़ोन की अनुमति नहीं मिली। ब्राउज़र सेटिंग में माइक्रोफ़ोन की अनुमति दें।"
+                  : "🎤 Microphone permission was blocked. Please allow microphone access in your browser settings.")
+              : (uiLang() === "hi"
+                  ? "🎤 वॉइस इनपुट अभी काम नहीं कर रहा। कृपया अपना सवाल टाइप करें।"
+                  : "🎤 Voice input isn't working right now. Please type your question instead.");
+            addBotMessage(msg, "kb");
+          };
+          try {
+            rec.start();
+          } catch (e) {
+            mic.classList.remove("listening");
+          }
+        });
+      }
       form.insertBefore(mic, form.querySelector("button[type='submit']"));
     }
 

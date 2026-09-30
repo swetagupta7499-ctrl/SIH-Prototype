@@ -342,6 +342,10 @@
   animation: sb-pulse 1s infinite;
 }
 
+.sb-mic.unsupported {
+  opacity: 0.55;
+}
+
 @keyframes sb-pulse {
   50% { transform: scale(1.08); }
 }
