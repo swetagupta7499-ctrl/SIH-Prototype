@@ -79,6 +79,10 @@
         Grievance
       </button>
 
+      <button class="nav-btn" data-page="mentor" onclick="showPage('mentor')">
+        Mentor
+      </button>
+
       <button class="nav-btn" data-page="admin" onclick="showPage('admin')">
         Officer Portal
       </button>
@@ -687,6 +691,77 @@
         <input id="grvSearch" class="fx-search" type="search" placeholder="Search by ticket ID, subject, department…">
       </div>
       <div id="grievanceList"></div>
+    </section>
+
+    <!-- MENTOR PAGE -->
+    <section id="mentor" class="page">
+      <div class="page-heading">
+        <span class="eyebrow">MENTORSHIP</span>
+        <h1>Mentor Support</h1>
+        <p>Guided document help, community endorsements, and mentor alerts for discrepancies.</p>
+      </div>
+
+      <!-- 1. MENTOR-GUIDED UPLOAD CHECKLIST -->
+      <div class="panel">
+        <span class="eyebrow">GUIDED UPLOAD</span>
+        <h2>Document Checklist &amp; Mentor Tips</h2>
+        <p class="muted">
+          A step-by-step checklist for each required document, with tips a mentor
+          would give. Flag any document you need help with and a mentor will follow up.
+        </p>
+        <div id="mentorChecklist" class="mentor-checklist"></div>
+      </div>
+
+      <!-- 2. COMMUNITY ENDORSEMENT -->
+      <div class="panel">
+        <span class="eyebrow">COMMUNITY ENDORSEMENT</span>
+        <h2>Endorse an Application</h2>
+        <p class="muted">
+          Mentors and community members can endorse an application. Endorsements are
+          shown to the reviewing officer as a signal of community support.
+        </p>
+        <form id="endorseForm" class="form-grid">
+          <label>
+            Application ID *
+            <input id="endAppId" required placeholder="e.g. TS260001">
+          </label>
+          <label>
+            Your name *
+            <input id="endName" required maxlength="60" placeholder="Endorser name">
+          </label>
+          <label>
+            Role
+            <select id="endRole">
+              <option>Community Mentor</option>
+              <option>Teacher</option>
+              <option>Village Head / Elder</option>
+              <option>NGO / Support Worker</option>
+              <option>Alumnus</option>
+            </select>
+          </label>
+          <label style="grid-column:1/-1">
+            Note (optional)
+            <input id="endNote" maxlength="140" placeholder="Why you endorse this student">
+          </label>
+          <div style="grid-column:1/-1">
+            <button type="submit" class="primary-btn">Add Endorsement</button>
+          </div>
+        </form>
+        <div id="endorseMessage" class="message"></div>
+        <div class="fx-list-head"><h2>Recent Endorsements</h2></div>
+        <div id="endorsementList"></div>
+      </div>
+
+      <!-- 3. DISCREPANCY ALERTS TO MENTOR -->
+      <div class="panel">
+        <span class="eyebrow">MENTOR ALERTS</span>
+        <h2>Discrepancy &amp; Help Alerts</h2>
+        <p class="muted">
+          When the document check finds a mismatch, or a student flags a document for
+          help, an alert appears here for the mentor to guide the student.
+        </p>
+        <div id="mentorAlertList"></div>
+      </div>
     </section>
 
     <!-- OFFICER PAGE -->

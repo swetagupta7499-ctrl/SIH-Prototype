@@ -640,6 +640,23 @@ function runCrossVerification() {
       <tbody>${rows.join("")}</tbody>
     </table>
   `;
+
+  // Raise a mentor alert when the cross-check finds a mismatch, so a mentor
+  // can guide the student (Mentor page). Guarded so it never breaks OCR flow.
+  try {
+    if (typeof mentorRaiseDiscrepancy === "function") {
+      const mismatch = crossCheckExtractedNames();
+      if (mismatch && mismatch.length) {
+        const appId = document.getElementById("fullName")?.value?.trim() || "current application";
+        mentorRaiseDiscrepancy(
+          appId,
+          `Name mismatch: form vs document (OCR read "${mismatch[0].ocrName}"). Student may need help correcting the name or re-uploading.`
+        );
+      }
+    }
+  } catch (e) {
+    console.warn("Mentor discrepancy hook skipped:", e);
+  }
 }
 
 function comparisonRowHtml(label, typedVal, ocrVal, source, isMatch) {
@@ -2037,11 +2054,20 @@ async function renderAdmin() {
           const appIssues = Array.isArray(application.issues) ? application.issues : [];
           const hasAlert = Boolean(alertCache[appDisplayId] || appIssues.length > 0);
           const preCheckLabel = application.pre_check ? "Basic checks passed" : "Issues detected";
+          const endorseCount = typeof window.mentorEndorsementCount === "function"
+            ? window.mentorEndorsementCount(appDisplayId) : 0;
 
           return `
             <tr>
               <td><strong>${escapeHTML(appDisplayId)}</strong></td>
-              <td>${escapeHTML(application.name)}</td>
+              <td>
+                ${escapeHTML(application.name)}
+                ${
+                  endorseCount > 0
+                    ? `<span class="endorse-badge" title="Community endorsements">🤝 ${endorseCount}</span>`
+                    : ""
+                }
+              </td>
               <td>${escapeHTML(application.scheme)}</td>
               <td>
                 ${escapeHTML(preCheckLabel)}
@@ -2345,6 +2371,7 @@ async function showPage(pageId) {
   }
   if (resolvedId === "admin") await renderAdmin();
   if (resolvedId === "home") await updateHomeStats();
+  if (resolvedId === "mentor" && typeof renderMentorPage === "function") renderMentorPage();
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -4339,4 +4366,260 @@ window.handleTicketReupload = handleTicketReupload;
       }
     );
   }
+})();
+
+
+/* =========================================================
+   14. MENTOR SUPPORT (client-side, localStorage-backed)
+   • Guided upload checklist with per-document mentor tips +
+     "flag for help"
+   • Community endorsement (endorse an application; count + names
+     shown to the officer)
+   • Discrepancy / help alerts routed to a mentor
+   ========================================================= */
+(function () {
+  "use strict";
+
+  const esc = window.escapeHTML || (s => String(s == null ? "" : s));
+  const ENDORSE_KEY = "tribalScholarEndorsements";
+  const ALERT_KEY = "tribalScholarMentorAlerts";
+  const FLAG_KEY = "tribalScholarDocHelpFlags";
+
+  function read(key) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  function write(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value.slice(-200)));
+    } catch {}
+  }
+  function nowIso() {
+    return new Date().toISOString();
+  }
+  function fmt(iso) {
+    return typeof formatDate === "function" ? formatDate(iso) : new Date(iso).toLocaleString();
+  }
+
+  /* ---- Guided upload checklist content (mentor tips per document) ---- */
+  const CHECKLIST = [
+    {
+      id: "stCertificate",
+      title: "ST / Caste Certificate",
+      tips: [
+        "Use the certificate issued by the competent authority (Tehsildar/SDM).",
+        "Make sure the name exactly matches your application and marksheet.",
+        "Scan flat in good light — no glare, all four corners visible."
+      ]
+    },
+    {
+      id: "marksheet",
+      title: "Marksheet / Academic Record",
+      tips: [
+        "Upload the latest qualifying exam marksheet.",
+        "Both percentage/CGPA and total marks should be clearly readable.",
+        "If your board shows CGPA, that's fine — the portal converts it."
+      ]
+    },
+    {
+      id: "incomeCertificate",
+      title: "Income Certificate",
+      tips: [
+        "Must be recent (usually within the last 1 year).",
+        "Annual family income figure should be clearly visible.",
+        "Issued by the revenue authority, not a self-declaration."
+      ]
+    },
+    {
+      id: "offerLetter",
+      title: "University Offer Letter (NOS only)",
+      tips: [
+        "Needed only for the National Overseas Scholarship (NOS).",
+        "Should show your name, the university and the course.",
+        "A clear PDF from the university is best."
+      ]
+    }
+  ];
+
+  /* ---- Doc-help flags ---- */
+  function getFlags() {
+    return read(FLAG_KEY);
+  }
+  function toggleFlag(docId, title) {
+    const flags = getFlags();
+    const idx = flags.findIndex(f => f.docId === docId);
+    if (idx !== -1) {
+      flags.splice(idx, 1);
+      write(FLAG_KEY, flags);
+      renderMentorPage();
+      return;
+    }
+    flags.push({ docId, title, at: nowIso() });
+    write(FLAG_KEY, flags);
+    // A flagged document is also a mentor alert.
+    mentorRaiseAlert("help", (window.currentUserEmail || "A student"),
+      `Requested help with: ${title}`);
+    renderMentorPage();
+  }
+  window.mentorToggleFlag = toggleFlag;
+
+  function renderChecklist() {
+    const box = document.getElementById("mentorChecklist");
+    if (!box) return;
+    const flags = getFlags();
+    box.innerHTML = CHECKLIST.map(item => {
+      const flagged = flags.some(f => f.docId === item.id);
+      const tips = item.tips.map(t => `<li>${esc(t)}</li>`).join("");
+      return `
+        <div class="mentor-doc ${flagged ? "flagged" : ""}">
+          <div class="mentor-doc-head">
+            <strong>${esc(item.title)}</strong>
+            <button type="button" class="text-btn"
+              onclick="mentorToggleFlag('${esc(item.id)}', '${esc(item.title).replace(/'/g, "\\'")}')">
+              ${flagged ? "✓ Help requested — cancel" : "🙋 Flag for mentor help"}
+            </button>
+          </div>
+          <ul class="mentor-tips">${tips}</ul>
+        </div>`;
+    }).join("");
+  }
+
+  /* ---- Community endorsement ---- */
+  function getEndorsements() {
+    return read(ENDORSE_KEY);
+  }
+  function endorsementsFor(appId) {
+    const id = String(appId || "").trim().toUpperCase();
+    return getEndorsements().filter(e => String(e.appId).toUpperCase() === id);
+  }
+  window.mentorEndorsementsFor = endorsementsFor;
+  window.mentorEndorsementCount = appId => endorsementsFor(appId).length;
+
+  function addEndorsement(appId, name, role, note) {
+    const list = getEndorsements();
+    list.push({
+      appId: String(appId).trim(),
+      name: String(name).trim(),
+      role: role || "Community Mentor",
+      note: (note || "").trim(),
+      at: nowIso()
+    });
+    write(ENDORSE_KEY, list);
+  }
+
+  function renderEndorsements() {
+    const box = document.getElementById("endorsementList");
+    if (!box) return;
+    const list = getEndorsements().slice().reverse().slice(0, 15);
+    if (!list.length) {
+      box.innerHTML = `<p class="muted">No endorsements yet.</p>`;
+      return;
+    }
+    box.innerHTML = list.map(e => `
+      <div class="mentor-endorse-card">
+        <div>
+          <strong>${esc(e.name)}</strong> <span class="muted">(${esc(e.role)})</span>
+          endorsed <strong>${esc(e.appId)}</strong>
+        </div>
+        ${e.note ? `<p class="muted">"${esc(e.note)}"</p>` : ""}
+        <span class="muted small">${esc(fmt(e.at))}</span>
+      </div>`).join("");
+  }
+
+  /* ---- Mentor alerts (discrepancies + help requests) ---- */
+  function getAlerts() {
+    return read(ALERT_KEY);
+  }
+  function mentorRaiseAlert(type, appId, message) {
+    const list = getAlerts();
+    // De-duplicate identical open alerts for the same app/message.
+    if (list.some(a => a.appId === appId && a.message === message && !a.resolved)) return;
+    list.push({
+      id: "MA" + Date.now().toString(36),
+      type, // "discrepancy" | "help"
+      appId: String(appId),
+      message: String(message),
+      at: nowIso(),
+      resolved: false
+    });
+    write(ALERT_KEY, list);
+  }
+  // Public helpers used by the OCR cross-verification hook and flags.
+  window.mentorRaiseDiscrepancy = (appId, message) => {
+    mentorRaiseAlert("discrepancy", appId, message);
+    if (document.getElementById("mentor")?.classList.contains("active")) renderAlerts();
+  };
+  window.mentorRaiseAlert = mentorRaiseAlert;
+
+  function resolveAlert(id) {
+    const list = getAlerts();
+    const a = list.find(x => x.id === id);
+    if (a) {
+      a.resolved = true;
+      a.resolvedAt = nowIso();
+      write(ALERT_KEY, list);
+    }
+    renderAlerts();
+  }
+  window.mentorResolveAlert = resolveAlert;
+
+  function renderAlerts() {
+    const box = document.getElementById("mentorAlertList");
+    if (!box) return;
+    const list = getAlerts().slice().reverse();
+    if (!list.length) {
+      box.innerHTML = `<p class="muted">No mentor alerts. Discrepancies and help requests will appear here.</p>`;
+      return;
+    }
+    box.innerHTML = list.map(a => `
+      <div class="mentor-alert ${a.resolved ? "resolved" : a.type}">
+        <div class="mentor-alert-head">
+          <span class="mentor-alert-tag">${a.type === "discrepancy" ? "⚠ Discrepancy" : "🙋 Help request"}</span>
+          <span class="muted small">${esc(fmt(a.at))}</span>
+        </div>
+        <p><strong>${esc(a.appId)}</strong> — ${esc(a.message)}</p>
+        ${
+          a.resolved
+            ? `<span class="muted small">✓ Resolved</span>`
+            : `<button type="button" class="secondary-btn" onclick="mentorResolveAlert('${esc(a.id)}')">Mark as guided / resolved</button>`
+        }
+      </div>`).join("");
+  }
+
+  /* ---- Page render + form wiring ---- */
+  function renderMentorPage() {
+    renderChecklist();
+    renderEndorsements();
+    renderAlerts();
+  }
+  window.renderMentorPage = renderMentorPage;
+
+  function wireForm() {
+    const form = document.getElementById("endorseForm");
+    if (!form || form.dataset.wired) return;
+    form.dataset.wired = "1";
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const appId = document.getElementById("endAppId")?.value.trim();
+      const name = document.getElementById("endName")?.value.trim();
+      const role = document.getElementById("endRole")?.value;
+      const note = document.getElementById("endNote")?.value;
+      const msg = document.getElementById("endorseMessage");
+      if (!appId || !name) {
+        if (msg) { msg.className = "message error"; msg.textContent = "Application ID and your name are required."; }
+        return;
+      }
+      addEndorsement(appId, name, role, note);
+      if (msg) { msg.className = "message success"; msg.textContent = `Endorsement added for ${appId}.`; }
+      form.reset();
+      renderEndorsements();
+    });
+  }
+
+  if (document.readyState !== "loading") wireForm();
+  else document.addEventListener("DOMContentLoaded", wireForm);
 })();

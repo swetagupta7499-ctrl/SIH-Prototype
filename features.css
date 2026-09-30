@@ -477,3 +477,62 @@
   display: grid;
   gap: 4px;
 }
+
+
+/* ===== Mentor support ===== */
+.mentor-checklist { display: grid; gap: 14px; margin-top: 12px; }
+.mentor-doc {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #fff;
+}
+.mentor-doc.flagged {
+  border-color: #e0a800;
+  background: #fffbe9;
+}
+.mentor-doc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mentor-tips {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #555;
+  font-size: 14px;
+}
+.mentor-tips li { margin: 3px 0; }
+
+.mentor-endorse-card,
+.mentor-alert {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  background: #fff;
+}
+.mentor-alert.discrepancy { border-left: 4px solid #d9534f; }
+.mentor-alert.help { border-left: 4px solid #e0a800; }
+.mentor-alert.resolved { opacity: 0.6; border-left: 4px solid #46a758; }
+.mentor-alert-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.mentor-alert-tag { font-weight: 600; }
+
+.endorse-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e8f5ee;
+  color: #1e7a52;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
