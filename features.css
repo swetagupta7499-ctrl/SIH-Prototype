@@ -536,3 +536,62 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+
+
+/* ===== Offline-first: status indicator + toast ===== */
+.net-status {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.net-status .net-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #46a758;
+  display: inline-block;
+}
+.net-status.offline {
+  background: #fff4e5;
+  border-color: #e0a800;
+  color: #8a6d00;
+}
+.net-status.offline .net-dot {
+  background: #e0a800;
+  animation: net-blink 1.2s infinite;
+}
+@keyframes net-blink { 50% { opacity: 0.3; } }
+
+.net-toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 1300;
+  max-width: 90vw;
+  padding: 11px 18px;
+  border-radius: 12px;
+  background: #1f2d3d;
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.net-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

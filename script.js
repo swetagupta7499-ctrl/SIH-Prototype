@@ -1685,6 +1685,28 @@ async function submitApplication(event) {
     );
   });
 
+  // OFFLINE-FIRST: if there's no network, queue the submission locally and
+  // let OfflineSync flush it automatically when the connection returns.
+  if (!navigator.onLine && window.OfflineSync) {
+    const ref = window.OfflineSync.enqueue(data, issues);
+    const preCheckLabel = issues.length ? "Issues detected" : "Basic checks passed";
+    showFormMessage(
+      `📴 You're offline. Your application has been saved on this device (ref ${ref}) and will be submitted automatically when you're back online. Pre-check: ${preCheckLabel}.`,
+      "success"
+    );
+    document.getElementById("applicationForm")?.reset();
+    Object.keys(ocrData).forEach(k => delete ocrData[k]);
+    ["stCertificate", "marksheet", "incomeCertificate"].forEach(docType => {
+      const box = document.getElementById(`ocr-${docType}`);
+      if (box) { box.innerHTML = ""; box.classList.add("hidden"); }
+    });
+    updateOcrSummary();
+    clearFieldCheck("fullName");
+    clearFieldCheck("marks");
+    clearFieldCheck("income");
+    return;
+  }
+
   if (submitButton) {
     submitButton.disabled = true;
     submitButton.textContent = "Submitting...";
@@ -4622,4 +4644,151 @@ window.handleTicketReupload = handleTicketReupload;
 
   if (document.readyState !== "loading") wireForm();
   else document.addEventListener("DOMContentLoaded", wireForm);
+})();
+
+
+/* =========================================================
+   15. OFFLINE-FIRST SYNC
+   • Queue application submissions made while offline (localStorage)
+   • Auto-sync when the network returns (online event)
+   • Online/offline status indicator + pending-sync count
+   Reuses createLocalFallbackApplication() to persist a queued app,
+   which itself mirrors to Supabase when a real session is available.
+   ========================================================= */
+(function () {
+  "use strict";
+
+  const QUEUE_KEY = "tribalScholarOfflineQueue";
+  const esc = window.escapeHTML || (s => String(s == null ? "" : s));
+
+  function readQueue() {
+    try {
+      const v = JSON.parse(localStorage.getItem(QUEUE_KEY));
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  function writeQueue(q) {
+    try {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    } catch {}
+    updateIndicator();
+  }
+  function pendingCount() {
+    return readQueue().length;
+  }
+
+  /* Add a submission to the offline queue. Returns a temporary reference id. */
+  function enqueue(data, issues) {
+    const q = readQueue();
+    const ref = "OFF" + Date.now().toString(36);
+    q.push({ ref, data, issues, queuedAt: new Date().toISOString() });
+    writeQueue(q);
+    return ref;
+  }
+  window.OfflineSync = { enqueue, pendingCount, syncNow };
+
+  /* Drain the queue: persist each queued application via the existing local
+     fallback (which mirrors to Supabase when possible). */
+  async function syncNow() {
+    if (!navigator.onLine) return;
+    const q = readQueue();
+    if (!q.length) return;
+
+    let synced = 0;
+    const remaining = [];
+    for (const item of q) {
+      try {
+        if (typeof createLocalFallbackApplication === "function") {
+          const app = createLocalFallbackApplication(item.data, item.issues || []);
+          synced++;
+          // Surface a deficiency alert on sync if the pre-check found issues.
+          if ((item.issues || []).length && typeof generateSmartDeficiencyAlert === "function") {
+            generateSmartDeficiencyAlert({ ...app, id: app.application_id || app.id }, item.issues);
+          }
+        } else {
+          remaining.push(item);
+        }
+      } catch (e) {
+        console.warn("Sync of queued item failed, keeping it:", e);
+        remaining.push(item);
+      }
+    }
+    writeQueue(remaining);
+
+    if (synced > 0) {
+      showToast(`✅ Synced ${synced} application${synced > 1 ? "s" : ""} that ${synced > 1 ? "were" : "was"} saved offline.`);
+      try {
+        if (typeof updateHomeStats === "function") await updateHomeStats();
+      } catch {}
+    }
+  }
+
+  /* ---- Online / offline status indicator ---- */
+  function ensureIndicator() {
+    let el = document.getElementById("netStatusIndicator");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "netStatusIndicator";
+      el.className = "net-status";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  function updateIndicator() {
+    const el = ensureIndicator();
+    const online = navigator.onLine;
+    const pending = pendingCount();
+    el.classList.toggle("offline", !online);
+    el.classList.toggle("online", online);
+    if (online) {
+      el.innerHTML = pending > 0
+        ? `<span class="net-dot"></span> Online · syncing ${esc(pending)}…`
+        : `<span class="net-dot"></span> Online`;
+    } else {
+      el.innerHTML = pending > 0
+        ? `<span class="net-dot"></span> Offline · ${esc(pending)} pending sync`
+        : `<span class="net-dot"></span> Offline — your work is saved on this device`;
+    }
+  }
+
+  function showToast(message) {
+    let t = document.getElementById("netToast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "netToast";
+      t.className = "net-toast";
+      document.body.appendChild(t);
+    }
+    t.textContent = message;
+    t.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => t.classList.remove("show"), 5000);
+  }
+
+  /* ---- Wire up events ---- */
+  function init() {
+    updateIndicator();
+    // If we come back online, sync automatically.
+    window.addEventListener("online", () => {
+      updateIndicator();
+      showToast("🔄 Back online — syncing your saved work…");
+      syncNow().then(updateIndicator);
+    });
+    window.addEventListener("offline", () => {
+      updateIndicator();
+      showToast("📴 You're offline. You can keep working — submissions are saved and will sync automatically.");
+    });
+    // On load, if already online with a backlog, drain it.
+    if (navigator.onLine && pendingCount() > 0) {
+      syncNow().then(updateIndicator);
+    }
+  }
+
+  if (document.readyState !== "loading") init();
+  else document.addEventListener("DOMContentLoaded", init);
 })();
