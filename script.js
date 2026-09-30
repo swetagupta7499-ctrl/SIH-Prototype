@@ -248,20 +248,23 @@ function extractStructuredFields(rawText, docType) {
   const text = normalizeOcrText(rawText);
 
   // --- Name: labelled first, then a fallback for an all-caps name line. ---
+  // Words that are never a person's name (watermarks, headers, table labels).
+  const NAME_STOP = /(BOARD|CERTIFICATE|MARKSHEET|MARK SHEET|GOVERNMENT|EXAMINATION|SECONDARY|SENIOR|HIGHER|UNIVERSITY|COUNCIL|EDUCATION|SCHOOL|COLLEGE|RESULT|STATEMENT|INCOME|CASTE|TRIBE|SCHEDULED|DIVISION|PASS|INDIA|STATE|DEPARTMENT|OFFICE|OFFICIAL|DOCUMENT|SAMPLE|DEMO|SPECIMEN|SUBJECT|MARKS|GRADE|TOTAL|CLASS|ROLL|SESSION|FATHER|MOTHER|GUARDIAN)/i;
+
   let name = null;
   const nameMatch = text.match(
-    /(?:Name\s*(?:of\s*(?:the\s*)?(?:Student|Candidate|Applicant|Holder))?)\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|D\.O\.B|Date|Born|Roll|Caste|Reg|$))/i
+    /(?:(?:Student|Candidate|Applicant|Holder|Pupil)['’s]*\s*)?Name(?:\s*of\s*(?:the\s*)?(?:Student|Candidate|Applicant|Holder))?\s*[:\-]?\s*([A-Z][A-Za-z.\s]{2,40}?)(?=\s{2,}|\s+(?:S\/o|D\/o|W\/o|Son|Daughter|Father|Mother|DOB|D\.O\.B|Date|Born|Roll|Caste|Reg|Class|Subject|Marks|Grade|Total|Session|$))/i
   );
-  if (nameMatch) {
+  if (nameMatch && !NAME_STOP.test(nameMatch[1])) {
     name = nameMatch[1];
-  } else {
+  }
+  if (!name) {
     // Fallback: scan all-caps word groups (typical printed names) and take the
-    // first that is not an obvious header/keyword line.
-    const STOP = /(BOARD|CERTIFICATE|MARKSHEET|MARK SHEET|GOVERNMENT|EXAMINATION|SECONDARY|SENIOR|HIGHER|UNIVERSITY|COUNCIL|EDUCATION|SCHOOL|COLLEGE|RESULT|STATEMENT|INCOME|CASTE|TRIBE|SCHEDULED|DIVISION|PASS|INDIA|STATE|DEPARTMENT|OFFICE)/;
+    // first that is not a header/watermark/table label.
     const re = /\b([A-Z][A-Z]+(?:\s+[A-Z][A-Z.]+){1,3})\b/g;
     let mm;
     while ((mm = re.exec(text)) !== null) {
-      if (!STOP.test(mm[1])) { name = mm[1]; break; }
+      if (!NAME_STOP.test(mm[1])) { name = mm[1]; break; }
     }
   }
 
