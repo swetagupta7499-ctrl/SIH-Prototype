@@ -21,6 +21,10 @@
     });
   </script>
 
+  <!-- PWA: installable + basic offline app shell -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1e7a52">
+
   <!-- GOOGLE TRANSLATE -->
   <script>
     function googleTranslateElementInit() {
@@ -290,6 +294,8 @@
         <h1>Scholarship Application</h1>
         <p>Enter your details and attach the required documents.</p>
       </div>
+
+      <div id="reuploadBanner" class="message info hidden" role="status" style="margin-bottom:16px"></div>
 
       <form id="applicationForm" class="panel">
         <!-- STEP 1 · IDENTITY VERIFICATION -->
@@ -802,6 +808,32 @@
           Approved applications automatically appear in the <strong>Payments</strong> tab.
         </p>
       </div>
+
+      <!-- OFFICER STATUS-CHANGE AUDIT LOG -->
+      <div class="panel" id="auditLogPanel">
+        <div class="table-heading">
+          <h2>Status Change Audit Log</h2>
+          <button class="secondary-btn" onclick="renderAuditLog()">
+            Refresh
+          </button>
+        </div>
+        <p class="muted small">
+          Append-only record of every status change for accountability.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Application ID</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Changed at</th>
+              </tr>
+            </thead>
+            <tbody id="statusAuditLog"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -877,9 +909,6 @@
   <!-- MAIN APPLICATION SCRIPT (unchanged) -->
   <script src="script.js"></script>
 
-  <!-- NEW: Wallet · DBT Tracker · Grievance (must load AFTER script.js) -->
-  <script src="features.js"></script>
-
   <!-- Data service · OCR pre-processing · DigiLocker/PFMS · multilingual AI
        (load AFTER script.js, in this order) -->
   <script src="js/data-service.js"></script>
@@ -905,5 +934,16 @@
        verifies UIDAI's signature -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="js/aadhaar-qr.js"></script>
+
+  <!-- PWA: register the service worker for basic offline support -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function (err) {
+          console.warn("Service worker registration failed:", err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

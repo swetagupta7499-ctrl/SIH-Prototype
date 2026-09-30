@@ -1954,6 +1954,23 @@ async function trackApplication(event) {
             `
             : ""
         }
+        ${
+          application.status === "Deficient"
+            ? `
+              <button
+                type="button"
+                class="primary-btn"
+                style="margin-top:12px"
+                onclick="startReupload('${escapeHTML(appDisplayId)}')"
+              >
+                📤 Re-upload corrected documents
+              </button>
+              <p class="muted" style="margin-top:8px">
+                Fix the issues listed above, then re-upload the corrected documents for review.
+              </p>
+            `
+            : ""
+        }
       </div>
     `;
 
@@ -1962,6 +1979,24 @@ async function trackApplication(event) {
     result.innerHTML = `<div class="message error">${escapeHTML(error.message)}</div>`;
   }
 }
+
+/* Re-upload flow for a Deficient application: remember which application is
+   being corrected and take the student to the Apply page to submit fresh
+   documents. */
+function startReupload(appId) {
+  try {
+    sessionStorage.setItem("tribalScholarReuploadFor", appId);
+  } catch {}
+  if (typeof showPage === "function") showPage("apply");
+  const banner = document.getElementById("reuploadBanner");
+  if (banner) {
+    banner.textContent = `Re-uploading corrected documents for application ${appId}. Upload the fixed files below and submit again.`;
+    banner.classList.remove("hidden");
+  }
+  const applyForm = document.getElementById("applicationForm");
+  if (applyForm && applyForm.scrollIntoView) applyForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+window.startReupload = startReupload;
 
 async function renderAdmin() {
   const allowed = await requireOfficer();
@@ -2068,6 +2103,13 @@ async function renderAdmin() {
   } catch (error) {
     console.error("Priority queue error:", error);
   }
+
+  // Officer status-change audit log
+  try {
+    await renderAuditLog();
+  } catch (error) {
+    console.error("Audit log error:", error);
+  }
 }
 
 async function updateStatus(id, status) {
@@ -2076,9 +2118,19 @@ async function updateStatus(id, status) {
   if (!allowed) return;
 
   try {
-    // Update in local fallback cache if present
+    // Capture the previous status for the audit trail before changing it.
     const localApps = getLocalApplications();
     const localIdx = localApps.findIndex(a => a.id === id || a.application_id === id);
+    let oldStatus = localIdx !== -1 ? localApps[localIdx].status : null;
+    if (oldStatus === null && !String(id).startsWith("TS")) {
+      try {
+        const { data } = await supabaseClient
+          .from("applications").select("status").eq("id", id).single();
+        oldStatus = data?.status ?? null;
+      } catch {}
+    }
+
+    // Update in local fallback cache if present
     if (localIdx !== -1) {
       localApps[localIdx].status = status;
       localApps[localIdx].updated_at = new Date().toISOString();
@@ -2096,12 +2148,108 @@ async function updateStatus(id, status) {
         .eq("id", id);
     }
 
+    // Record the change in the audit trail (Supabase for real IDs, plus a
+    // local mirror so the officer portal can always display recent history).
+    await recordStatusAudit(id, oldStatus, status);
+
     await renderAdmin();
     await updateHomeStats();
   } catch (error) {
     alert(error?.message || "Unable to update status.");
   }
 }
+
+/* ---------------------------------------------------------
+   OFFICER STATUS-CHANGE AUDIT LOG
+   Append-only trail of status changes. Written to Supabase
+   (status_audit_log table) for real application IDs, and always
+   mirrored to a local store so the Officer Portal can show recent
+   history even in the offline/demo path.
+   --------------------------------------------------------- */
+const AUDIT_LOG_KEY = "tribalScholarStatusAudit";
+
+function getLocalAuditLog() {
+  try {
+    return JSON.parse(localStorage.getItem(AUDIT_LOG_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalAuditLog(entries) {
+  try {
+    // Keep the most recent 200 entries.
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(entries.slice(-200)));
+  } catch {}
+}
+
+async function recordStatusAudit(applicationId, oldStatus, newStatus) {
+  const entry = {
+    application_id: applicationId,
+    old_status: oldStatus || null,
+    new_status: newStatus,
+    changed_at: new Date().toISOString()
+  };
+
+  // Local mirror (always).
+  const local = getLocalAuditLog();
+  local.push(entry);
+  saveLocalAuditLog(local);
+
+  // Supabase (best effort, only for real UUID application IDs).
+  if (!String(applicationId).startsWith("TS")) {
+    try {
+      await supabaseClient.from("status_audit_log").insert({
+        application_id: applicationId,
+        old_status: oldStatus || null,
+        new_status: newStatus
+      });
+    } catch (err) {
+      console.warn("Audit log insert skipped:", err?.message || err);
+    }
+  }
+}
+
+/* Merge Supabase + local audit rows, newest first. */
+async function fetchAuditLog(limit = 25) {
+  const rows = [];
+  try {
+    const { data } = await supabaseClient
+      .from("status_audit_log")
+      .select("application_id, old_status, new_status, changed_at")
+      .order("changed_at", { ascending: false })
+      .limit(limit);
+    if (Array.isArray(data)) rows.push(...data);
+  } catch {}
+  // Add local entries that Supabase does not have (e.g. demo "TS" IDs).
+  const localOnly = getLocalAuditLog().filter(e => String(e.application_id).startsWith("TS"));
+  rows.push(...localOnly);
+  rows.sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at));
+  return rows.slice(0, limit);
+}
+
+async function renderAuditLog() {
+  const box = document.getElementById("statusAuditLog");
+  if (!box) return;
+  try {
+    const rows = await fetchAuditLog(25);
+    if (!rows.length) {
+      box.innerHTML = `<tr><td colspan="4" class="empty-state">No status changes recorded yet.</td></tr>`;
+      return;
+    }
+    box.innerHTML = rows.map(r => `
+      <tr>
+        <td><strong>${escapeHTML(String(r.application_id))}</strong></td>
+        <td>${escapeHTML(r.old_status || "—")}</td>
+        <td>${escapeHTML(r.new_status)}</td>
+        <td>${escapeHTML(formatDate(r.changed_at))}</td>
+      </tr>
+    `).join("");
+  } catch (error) {
+    box.innerHTML = `<tr><td colspan="4" class="empty-state">${escapeHTML(error.message)}</td></tr>`;
+  }
+}
+window.renderAuditLog = renderAuditLog;
 
 async function saveReviewNote(applicationId) {
   const allowed = await requireOfficer();
